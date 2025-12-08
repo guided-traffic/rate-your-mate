@@ -29,6 +29,8 @@ export class AuthService {
     console.log('[AuthService] Constructor - Token exists:', !!token);
     this.tokenExists.set(!!token);
     if (token) {
+      // Set loading to true BEFORE loadCurrentUser to prevent race condition
+      this.loading.set(true);
       this.loadCurrentUser();
     }
   }

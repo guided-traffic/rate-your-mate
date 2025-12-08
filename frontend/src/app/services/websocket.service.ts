@@ -1,6 +1,7 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, inject } from '@angular/core';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
+import { ConnectionStatusService } from './connection-status.service';
 import { WebSocketMessage, VotePayload, SettingsPayload } from '../models/websocket.model';
 import { Subject, Observable } from 'rxjs';
 
@@ -8,11 +9,11 @@ import { Subject, Observable } from 'rxjs';
   providedIn: 'root'
 })
 export class WebSocketService {
+  private authService = inject(AuthService);
+  private connectionStatus = inject(ConnectionStatusService);
+
   private socket: WebSocket | null = null;
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectDelay = 3000;
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private wasConnected = false; // Track if we were ever connected
 
   private connected = signal(false);
   readonly isConnected = this.connected.asReadonly();
@@ -25,8 +26,6 @@ export class WebSocketService {
   // General messages observable for timeline component
   private messagesSubject = new Subject<{ type: string; payload: VotePayload }>();
   readonly messages$: Observable<{ type: string; payload: VotePayload }> = this.messagesSubject.asObservable();
-
-  constructor(private authService: AuthService) {}
 
   connect(): void {
     const token = this.authService.getToken();
@@ -49,12 +48,6 @@ export class WebSocketService {
       this.socket = null;
     }
 
-    // Clear any pending reconnect timer
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-
     const wsUrl = `${environment.wsUrl}?token=${token}`;
     console.log('WebSocket: Connecting to', wsUrl);
 
@@ -64,7 +57,7 @@ export class WebSocketService {
       this.socket.onopen = () => {
         console.log('WebSocket: Connected successfully');
         this.connected.set(true);
-        this.reconnectAttempts = 0;
+        this.wasConnected = true;
       };
 
       this.socket.onmessage = (event) => {
@@ -82,14 +75,18 @@ export class WebSocketService {
         this.connected.set(false);
         this.socket = null;
 
-        // Attempt to reconnect if not a normal closure and user is still authenticated
-        if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts && this.authService.isAuthenticated()) {
-          this.scheduleReconnect();
+        // Only show reconnect spinner if we were previously connected
+        // This prevents showing spinner on initial connection failures
+        if (event.code !== 1000 && this.wasConnected && this.authService.isAuthenticated()) {
+          // Show spinner and start reconnect via ConnectionStatusService
+          // This will reload the page when backend is back
+          this.connectionStatus.setDisconnected();
         }
       };
 
       this.socket.onerror = (error) => {
         console.error('WebSocket: Error', error);
+        // Note: onclose will be called after onerror, so we don't set disconnected here
       };
     } catch (error) {
       console.error('WebSocket: Failed to create connection', error);
@@ -98,19 +95,12 @@ export class WebSocketService {
   }
 
   disconnect(): void {
-    // Clear any pending reconnect timer
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-
     if (this.socket) {
       console.log('WebSocket: Disconnecting...');
       this.socket.close(1000, 'User logout');
       this.socket = null;
       this.connected.set(false);
     }
-    this.reconnectAttempts = 0;
   }
 
   private handleMessage(message: WebSocketMessage<VotePayload | SettingsPayload>): void {
@@ -127,18 +117,5 @@ export class WebSocketService {
       default:
         console.log('WebSocket: Unknown message type', message.type);
     }
-  }
-
-  private scheduleReconnect(): void {
-    this.reconnectAttempts++;
-    const delay = this.reconnectDelay * this.reconnectAttempts;
-    console.log(`WebSocket: Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = null;
-      if (this.authService.isAuthenticated()) {
-        this.connect();
-      }
-    }, delay);
   }
 }
