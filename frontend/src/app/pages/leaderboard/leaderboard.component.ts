@@ -141,13 +141,6 @@ import { AchievementLeaderboard } from '../../models/vote.model';
       border: 1px solid $border-color;
       border-radius: $radius-lg;
       overflow: hidden;
-      transition: all $transition-base;
-
-      &:hover {
-        border-color: $border-light;
-        transform: translateY(-2px);
-        box-shadow: $shadow-lg;
-      }
 
       &.positive {
         border-top: 3px solid $accent-positive;

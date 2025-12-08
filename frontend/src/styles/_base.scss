@@ -132,11 +132,6 @@ a {
   border: 1px solid $border-color;
   border-radius: $radius-lg;
   padding: 20px;
-  transition: all $transition-fast;
-
-  &:hover {
-    border-color: $border-light;
-  }
 
   &-header {
     margin-bottom: 16px;

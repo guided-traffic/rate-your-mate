@@ -62,20 +62,12 @@
     background: rgba($accent-positive, 0.12);
     color: $accent-positive;
     border: 1px solid rgba($accent-positive, 0.3);
-
-    &:hover {
-      background: rgba($accent-positive, 0.2);
-    }
   }
 
   &.negative {
     background: rgba($accent-negative, 0.12);
     color: $accent-negative;
     border: 1px solid rgba($accent-negative, 0.3);
-
-    &:hover {
-      background: rgba($accent-negative, 0.2);
-    }
   }
 }
 
@@ -114,12 +106,6 @@
   background: $bg-card;
   border: 1px solid $border-color;
   border-radius: $radius-lg;
-  transition: all $transition-fast;
-
-  &:hover {
-    border-color: $border-light;
-    transform: translateX(4px);
-  }
 
   .timeline-avatars {
     display: flex;
@@ -169,12 +155,6 @@
   border-radius: $radius-lg;
   cursor: pointer;
   transition: all $transition-fast;
-
-  &:hover {
-    border-color: $accent-primary;
-    transform: translateY(-4px);
-    box-shadow: $shadow-lg, 0 0 20px rgba($accent-primary, 0.15);
-  }
 
   &.selected {
     border-color: $accent-primary;
