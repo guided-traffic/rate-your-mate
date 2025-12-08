@@ -60,6 +60,9 @@ import { Subscription } from 'rxjs';
                     [class.positive]="vote.achievement.is_positive !== false"
                     [class.negative]="vote.achievement.is_positive === false"
                   >
+                    @if (vote.achievement.image_url) {
+                      <img [src]="vote.achievement.image_url" [alt]="vote.achievement.name" class="achievement-icon" />
+                    }
                     {{ vote.achievement.name || vote.achievement_id }}
                   </span>
                   bewertet

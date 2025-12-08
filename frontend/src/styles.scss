@@ -58,16 +58,29 @@
   font-weight: 500;
   transition: all $transition-fast;
 
+  .achievement-icon {
+    width: 18px;
+    height: 18px;
+  }
+
   &.positive {
     background: rgba($accent-positive, 0.12);
     color: $accent-positive;
     border: 1px solid rgba($accent-positive, 0.3);
+
+    .achievement-icon {
+      filter: invert(65%) sepia(52%) saturate(5765%) hue-rotate(103deg) brightness(96%) contrast(85%);
+    }
   }
 
   &.negative {
     background: rgba($accent-negative, 0.12);
     color: $accent-negative;
     border: 1px solid rgba($accent-negative, 0.3);
+
+    .achievement-icon {
+      filter: invert(39%) sepia(95%) saturate(1834%) hue-rotate(336deg) brightness(96%) contrast(93%);
+    }
   }
 }
 

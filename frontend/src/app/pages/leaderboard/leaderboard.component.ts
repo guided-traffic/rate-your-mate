@@ -29,8 +29,13 @@ import { AchievementLeaderboard } from '../../models/vote.model';
             @for (item of positiveAchievements(); track item.achievement.id) {
               <div class="leaderboard-card positive">
                 <div class="card-header">
-                  <h3 class="achievement-name">{{ item.achievement.name }}</h3>
-                  <p class="achievement-desc">{{ item.achievement.description }}</p>
+                  @if (item.achievement.image_url) {
+                    <img [src]="item.achievement.image_url" [alt]="item.achievement.name" class="achievement-icon" />
+                  }
+                  <div class="card-header-text">
+                    <h3 class="achievement-name">{{ item.achievement.name }}</h3>
+                    <p class="achievement-desc">{{ item.achievement.description }}</p>
+                  </div>
                 </div>
 
                 <div class="leaders">
@@ -69,8 +74,13 @@ import { AchievementLeaderboard } from '../../models/vote.model';
             @for (item of negativeAchievements(); track item.achievement.id) {
               <div class="leaderboard-card negative">
                 <div class="card-header">
-                  <h3 class="achievement-name">{{ item.achievement.name }}</h3>
-                  <p class="achievement-desc">{{ item.achievement.description }}</p>
+                  @if (item.achievement.image_url) {
+                    <img [src]="item.achievement.image_url" [alt]="item.achievement.name" class="achievement-icon" />
+                  }
+                  <div class="card-header-text">
+                    <h3 class="achievement-name">{{ item.achievement.name }}</h3>
+                    <p class="achievement-desc">{{ item.achievement.description }}</p>
+                  </div>
                 </div>
 
                 <div class="leaders">
@@ -152,9 +162,35 @@ import { AchievementLeaderboard } from '../../models/vote.model';
     }
 
     .card-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
       padding: 16px 20px;
       background: $bg-tertiary;
       border-bottom: 1px solid $border-color;
+
+      .achievement-icon {
+        width: 48px;
+        height: 48px;
+        padding: 8px;
+        border-radius: $radius-sm;
+        flex-shrink: 0;
+      }
+
+      .card-header-text {
+        flex: 1;
+        min-width: 0;
+      }
+    }
+
+    .positive .card-header .achievement-icon {
+      background: rgba($accent-positive, 0.15);
+      filter: invert(65%) sepia(52%) saturate(5765%) hue-rotate(103deg) brightness(96%) contrast(85%);
+    }
+
+    .negative .card-header .achievement-icon {
+      background: rgba($accent-negative, 0.15);
+      filter: invert(39%) sepia(95%) saturate(1834%) hue-rotate(336deg) brightness(96%) contrast(93%);
     }
 
     .achievement-name {

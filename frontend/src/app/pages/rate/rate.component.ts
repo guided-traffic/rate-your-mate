@@ -86,6 +86,9 @@ import { Achievement } from '../../models/achievement.model';
                   [class.selected]="selectedAchievement()?.id === achievement.id"
                   (click)="selectAchievement(achievement)"
                 >
+                  @if (achievement.image_url) {
+                    <img [src]="achievement.image_url" [alt]="achievement.name" class="achievement-icon positive" />
+                  }
                   <span class="achievement-name">{{ achievement.name }}</span>
                   <span class="achievement-desc">{{ achievement.description }}</span>
                 </button>
@@ -102,6 +105,9 @@ import { Achievement } from '../../models/achievement.model';
                   [class.selected]="selectedAchievement()?.id === achievement.id"
                   (click)="selectAchievement(achievement)"
                 >
+                  @if (achievement.image_url) {
+                    <img [src]="achievement.image_url" [alt]="achievement.name" class="achievement-icon negative" />
+                  }
                   <span class="achievement-name">{{ achievement.name }}</span>
                   <span class="achievement-desc">{{ achievement.description }}</span>
                 </button>
@@ -271,7 +277,7 @@ import { Achievement } from '../../models/achievement.model';
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 4px;
+      gap: 8px;
       padding: 16px;
       background: $bg-card;
       border: 1px solid $border-color;
@@ -279,6 +285,23 @@ import { Achievement } from '../../models/achievement.model';
       cursor: pointer;
       text-align: left;
       transition: all $transition-fast;
+
+      .achievement-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: $radius-sm;
+        padding: 8px;
+
+        &.positive {
+          background: rgba($accent-positive, 0.15);
+          filter: invert(65%) sepia(52%) saturate(5765%) hue-rotate(103deg) brightness(96%) contrast(85%);
+        }
+
+        &.negative {
+          background: rgba($accent-negative, 0.15);
+          filter: invert(39%) sepia(95%) saturate(1834%) hue-rotate(336deg) brightness(96%) contrast(93%);
+        }
+      }
 
       &:hover {
         border-color: $border-light;
