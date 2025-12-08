@@ -71,6 +71,12 @@ import { Subscription, interval } from 'rxjs';
 
               @if (menuOpen) {
                 <div class="dropdown-menu">
+                  <div class="dropdown-header">
+                    <span class="dropdown-steam-id">ID: {{ auth.user()?.steam_id }}</span>
+                    <button class="copy-btn" (click)="copySteamId($event)" [title]="copied() ? 'Kopiert!' : 'ID kopieren'">
+                      {{ copied() ? '✓' : '📋' }}
+                    </button>
+                  </div>
                   <a [href]="auth.user()?.profile_url" target="_blank" class="dropdown-item">
                     <span>🔗</span> Steam Profile
                   </a>
@@ -295,6 +301,39 @@ import { Subscription, interval } from 'rxjs';
       animation: fadeIn 0.15s ease;
     }
 
+    .dropdown-header {
+      padding: 10px 16px;
+      background: $bg-tertiary;
+      border-bottom: 1px solid $border-color;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .dropdown-steam-id {
+      font-size: 12px;
+      font-family: monospace;
+      color: $text-muted;
+    }
+
+    .copy-btn {
+      background: none;
+      border: 1px solid $border-color;
+      border-radius: $radius-sm;
+      padding: 4px 8px;
+      font-size: 12px;
+      cursor: pointer;
+      color: $text-muted;
+      transition: all $transition-fast;
+
+      &:hover {
+        background: $bg-hover;
+        color: $text-primary;
+        border-color: $accent-primary;
+      }
+    }
+
     .dropdown-item {
       display: flex;
       align-items: center;
@@ -355,6 +394,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
   private timerSubscription?: Subscription;
 
   menuOpen = false;
+  copied = signal(false);
 
   // Signal for tracking seconds until next credit
   private secondsUntilCredit = signal(0);
@@ -433,5 +473,16 @@ export class HeaderComponent implements OnInit, OnDestroy {
     this.ws.disconnect();
     this.auth.logout();
     this.menuOpen = false;
+  }
+
+  copySteamId(event: Event): void {
+    event.stopPropagation();
+    const steamId = this.auth.user()?.steam_id;
+    if (steamId) {
+      navigator.clipboard.writeText(steamId).then(() => {
+        this.copied.set(true);
+        setTimeout(() => this.copied.set(false), 2000);
+      });
+    }
   }
 }
