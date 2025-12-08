@@ -170,14 +170,16 @@ func (h *AuthHandler) Me(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"user": gin.H{
-			"id":                    user.ID,
-			"steam_id":              user.SteamID,
-			"username":              user.Username,
-			"avatar_url":            user.AvatarURL,
-			"avatar_small":          user.AvatarSmall,
-			"profile_url":           user.ProfileURL,
-			"credits":               credits,
-			"seconds_until_credit":  int(timeUntilNext.Seconds()),
+			"id":                     user.ID,
+			"steam_id":               user.SteamID,
+			"username":               user.Username,
+			"avatar_url":             user.AvatarURL,
+			"avatar_small":           user.AvatarSmall,
+			"profile_url":            user.ProfileURL,
+			"credits":                credits,
+			"seconds_until_credit":   int(timeUntilNext.Seconds()),
+			"credit_interval_seconds": h.cfg.CreditIntervalMinutes * 60,
+			"credit_max":             h.cfg.CreditMax,
 		},
 	})
 }
