@@ -27,3 +27,4 @@ frontend/.angular/
 # Helm
 helm/*/charts/
 *.tgz
+node_modules/
