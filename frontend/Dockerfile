@@ -1,27 +1,41 @@
 # Build stage
-FROM node:24-alpine AS builder
+FROM node:22-alpine AS builder
+
+# Accept build arguments
+ARG BUILD_NUMBER
+ARG GIT_COMMIT
+ARG BUILD_TIME
 
 WORKDIR /app
-
-# Copy package files
 COPY package*.json ./
 RUN npm ci
 
-# Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
+RUN npm run build -- --configuration=production
 
 # Production stage
 FROM nginx:alpine
 
-# Copy custom nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Create temp directories for read-only filesystem and set permissions
+RUN mkdir -p /tmp/nginx-client-body /tmp/nginx-proxy /tmp/nginx-fastcgi /tmp/nginx-uwsgi /tmp/nginx-scgi && \
+    mkdir -p /usr/share/nginx/html && \
+    chown -R nginx:nginx /tmp/nginx-* /var/cache/nginx /usr/share/nginx/html && \
+    chmod -R 755 /tmp/nginx-* /var/cache/nginx
 
-# Copy built application
+# Copy custom nginx config
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Copy built app
 COPY --from=builder /app/dist/frontend/browser /usr/share/nginx/html
 
-EXPOSE 80
+# Set ownership and permissions
+RUN chown -R nginx:nginx /usr/share/nginx/html
+
+# Expose port
+EXPOSE 8080
+
+# Run as nginx user
+USER nginx
 
 CMD ["nginx", "-g", "daemon off;"]
