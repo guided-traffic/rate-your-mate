@@ -17,6 +17,9 @@ spec:
       {{- end }}
       labels:
         {{- include "lan-party-manager.backendSelectorLabels" . | nindent 8 }}
+        {{- with .Values.backend.extraPodLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

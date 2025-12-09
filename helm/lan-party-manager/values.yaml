@@ -9,6 +9,8 @@ frontend:
   service:
     type: ClusterIP
     port: 80
+  # Extra labels for frontend pods
+  extraPodLabels: {}
   resources:
     limits:
       cpu: 200m
@@ -25,6 +27,8 @@ backend:
   service:
     type: ClusterIP
     port: 8080
+  # Extra labels for backend pods
+  extraPodLabels: {}
   resources:
     limits:
       cpu: 500m
