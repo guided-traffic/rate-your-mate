@@ -2,8 +2,27 @@ apiVersion: v1
 entries:
   lan-party-manager:
   - apiVersion: v2
+    appVersion: 1.2.3
+    created: "2025-12-09T07:48:55.410548694Z"
+    description: A Helm chart for the LAN Party Manager application
+    digest: 6fcfcbf279d0f03b2586c3fdb5a45ac34cc0b479be7c7aa0ba5dc3e3acbfc2a1
+    home: https://github.com/guided-traffic/lan-party-manager
+    keywords:
+    - lan-party
+    - gaming
+    - event-management
+    maintainers:
+    - name: guided-traffic
+    name: lan-party-manager
+    sources:
+    - https://github.com/guided-traffic/lan-party-manager
+    type: application
+    urls:
+    - https://guided-traffic.github.io/lan-party-manager/lan-party-manager-1.2.3.tgz
+    version: 1.2.3
+  - apiVersion: v2
     appVersion: 1.2.2
-    created: "2025-12-09T07:37:48.26092628Z"
+    created: "2025-12-09T07:48:55.410040423Z"
     description: A Helm chart for the LAN Party Manager application
     digest: cf0a746fc2a7ad6e092946a03a5a92c94bc4494d801d246243410526f8b2f285
     home: https://github.com/guided-traffic/lan-party-manager
@@ -22,7 +41,7 @@ entries:
     version: 1.2.2
   - apiVersion: v2
     appVersion: 1.2.1
-    created: "2025-12-09T07:37:48.260374105Z"
+    created: "2025-12-09T07:48:55.40908728Z"
     description: A Helm chart for the LAN Party Manager application
     digest: b52f4a7dfe85557da7a688c3cd7111dbf121f9ec1f12a577550c766e166a68e9
     home: https://github.com/guided-traffic/lan-party-manager
@@ -41,7 +60,7 @@ entries:
     version: 1.2.1
   - apiVersion: v2
     appVersion: 1.2.0
-    created: "2025-12-09T07:37:48.259486827Z"
+    created: "2025-12-09T07:48:55.408318416Z"
     description: A Helm chart for the LAN Party Manager application
     digest: 013279e80198cfc3577e79ffd7c006c23949c675569a20c72bd6482cd90a7ac9
     home: https://github.com/guided-traffic/lan-party-manager
@@ -58,4 +77,4 @@ entries:
     urls:
     - https://guided-traffic.github.io/lan-party-manager/lan-party-manager-1.2.0.tgz
     version: 1.2.0
-generated: "2025-12-09T07:37:48.258968207Z"
+generated: "2025-12-09T07:48:55.407774227Z"
