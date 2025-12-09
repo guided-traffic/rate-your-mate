@@ -17,6 +17,9 @@ RUN npm run build -- --configuration=production
 # Production stage
 FROM nginx:alpine
 
+# Remove default entrypoint scripts that try to modify config files
+RUN rm -rf /docker-entrypoint.d/*
+
 # Create temp directories for read-only filesystem and set permissions
 RUN mkdir -p /tmp/nginx-client-body /tmp/nginx-proxy /tmp/nginx-fastcgi /tmp/nginx-uwsgi /tmp/nginx-scgi && \
     mkdir -p /usr/share/nginx/html && \
