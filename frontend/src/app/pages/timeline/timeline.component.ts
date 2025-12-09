@@ -135,12 +135,19 @@ import { Subscription } from 'rxjs';
     .timeline-avatars {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 30px;
       flex-shrink: 0;
+
+      .avatar {
+        position: relative;
+        z-index: 1;
+      }
 
       .arrow {
         color: $text-muted;
         font-size: 14px;
+        position: relative;
+        z-index: 2;
       }
     }
 
