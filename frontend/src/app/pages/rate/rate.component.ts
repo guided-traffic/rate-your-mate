@@ -55,14 +55,12 @@ import { Achievement } from '../../models/achievement.model';
               <div
                 class="player-card"
                 [class.selected]="selectedUser()?.id === user.id"
+                [style.background-image]="'url(' + (user.avatar_url || user.avatar_small || '/assets/default-avatar.png') + ')'"
                 (click)="selectUser(user)"
               >
-                <img
-                  [src]="user.avatar_url || user.avatar_small || '/assets/default-avatar.png'"
-                  [alt]="user.username"
-                  class="avatar avatar-lg player-avatar"
-                />
-                <span class="player-name">{{ user.username }}</span>
+                <div class="player-name-overlay">
+                  <span class="player-name">{{ user.username }}</span>
+                </div>
               </div>
             }
           </div>

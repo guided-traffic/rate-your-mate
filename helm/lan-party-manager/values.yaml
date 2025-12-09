@@ -3,7 +3,7 @@ replicaCount: 1
 
 frontend:
   image:
-    repository: lan-party-manager/frontend
+    repository: docker.io/guidedtraffic/lan-party-manager-frontend
     tag: latest
     pullPolicy: IfNotPresent
   service:
@@ -19,7 +19,7 @@ frontend:
 
 backend:
   image:
-    repository: lan-party-manager/backend
+    repository: docker.io/guidedtraffic/lan-party-manager-backend
     tag: latest
     pullPolicy: IfNotPresent
   service:
@@ -32,6 +32,17 @@ backend:
     requests:
       cpu: 250m
       memory: 256Mi
+  # Persistent storage for SQLite database
+  persistence:
+    enabled: false
+    # Storage class - leave empty for default, set to "-" for no storage class
+    storageClass: ""
+    # Access mode
+    accessMode: ReadWriteOnce
+    # Size of the persistent volume
+    size: 1Gi
+    # Mount path inside the container
+    mountPath: /app/data
   env:
     PORT: "8080"
     FRONTEND_URL: "http://localhost:4200"

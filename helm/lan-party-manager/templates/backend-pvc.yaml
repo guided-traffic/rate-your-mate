@@ -1,0 +1,21 @@
+{{- if .Values.backend.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "lan-party-manager.fullname" . }}-backend-data
+  labels:
+    {{- include "lan-party-manager.backendLabels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.backend.persistence.accessMode | default "ReadWriteOnce" }}
+  {{- if .Values.backend.persistence.storageClass }}
+  {{- if (eq "-" .Values.backend.persistence.storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ .Values.backend.persistence.storageClass | quote }}
+  {{- end }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.backend.persistence.size | default "1Gi" }}
+{{- end }}

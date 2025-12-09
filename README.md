@@ -1,23 +1,71 @@
 # LAN Party Manager
 
-Eine Webanwendung zur Verwaltung von LAN-Party-Events.
+Eine Webanwendung für LAN-Partys, bei der sich Spieler gegenseitig mit Achievements bewerten können.
 
-## 🚀 Technologie-Stack
+## ✨ Features
 
-- **Frontend**: Angular 19+ mit TypeScript und SCSS
-- **Backend**: Go 1.22+ mit Gin Framework
-- **Deployment**: Kubernetes mit Helm Charts
+- 🎮 **Steam Login** - Authentifizierung über Steam OpenID
+- 💰 **Credit System** - Spieler erhalten automatisch Credits über Zeit
+- 🏆 **Achievement Voting** - Spieler bewerten sich gegenseitig mit vordefinierten Achievements
+- 📺 **Live Timeline** - Alle Votes in Echtzeit via WebSocket
+- 🥇 **Leaderboard** - Top 3 pro Achievement
 
-## 📁 Projektstruktur
+## 🚀 Installation
 
+### Voraussetzungen
+
+- Kubernetes Cluster
+- Helm 3.x
+- Steam Web API Key ([hier beantragen](https://steamcommunity.com/dev/apikey))
+
+### Helm Repository hinzufügen
+
+```bash
+helm repo add lan-party-manager https://guided-traffic.github.io/lan-party-manager
+helm repo update
 ```
-lan-party-manager/
-├── frontend/                 # Angular Frontend
-├── backend/                  # Go Backend
-├── helm/                     # Helm Charts
-│   └── lan-party-manager/
-└── .github/                  # GitHub Konfiguration
+
+### Installation
+
+```bash
+helm install lan-party-manager lan-party-manager/lan-party-manager \
+  --set secrets.steamApiKey=DEIN_STEAM_API_KEY \
+  --set secrets.jwtSecret=$(openssl rand -base64 32)
 ```
+
+### Mit Ingress
+
+```bash
+helm install lan-party-manager lan-party-manager/lan-party-manager \
+  --set secrets.steamApiKey=DEIN_STEAM_API_KEY \
+  --set secrets.jwtSecret=$(openssl rand -base64 32) \
+  --set ingress.enabled=true \
+  --set ingress.hosts[0].host=lan-party.example.com \
+  --set ingress.hosts[0].paths[0].path=/ \
+  --set ingress.hosts[0].paths[0].pathType=Prefix \
+  --set backend.env.FRONTEND_URL=https://lan-party.example.com \
+  --set backend.env.BACKEND_URL=https://lan-party.example.com
+```
+
+### Mit eigener Values-Datei
+
+```bash
+helm install lan-party-manager lan-party-manager/lan-party-manager -f values.yaml
+```
+
+## ⚙️ Konfiguration
+
+| Parameter | Beschreibung | Default |
+|-----------|--------------|---------|
+| `secrets.steamApiKey` | Steam Web API Key (erforderlich) | `""` |
+| `secrets.jwtSecret` | JWT Secret für Token-Signierung (erforderlich) | `""` |
+| `backend.env.CREDIT_INTERVAL_MINUTES` | Minuten zwischen Credit-Vergabe | `10` |
+| `backend.env.CREDIT_MAX` | Maximale Credits pro Spieler | `10` |
+| `backend.env.JWT_EXPIRATION_DAYS` | JWT Gültigkeit in Tagen | `7` |
+| `ingress.enabled` | Ingress aktivieren | `false` |
+| `ingress.hosts` | Ingress Hosts Konfiguration | `[]` |
+
+Alle verfügbaren Optionen findest du in der [values.yaml](helm/lan-party-manager/values.yaml).
 
 ## 🛠️ Entwicklung
 
@@ -25,10 +73,8 @@ lan-party-manager/
 
 - Node.js 20+
 - Go 1.22+
-- Docker (optional)
-- Kubernetes & Helm (für Deployment)
 
-### Frontend starten
+### Frontend
 
 ```bash
 cd frontend
@@ -36,56 +82,13 @@ npm install
 npm start
 ```
 
-Das Frontend ist unter http://localhost:4200 erreichbar.
-
-### Backend starten
+### Backend
 
 ```bash
 cd backend
 go mod tidy
 go run main.go
 ```
-
-Das Backend ist unter http://localhost:8080 erreichbar.
-
-## 🐳 Docker
-
-### Images bauen
-
-```bash
-# Frontend
-docker build -t lan-party-manager/frontend:latest ./frontend
-
-# Backend
-docker build -t lan-party-manager/backend:latest ./backend
-```
-
-## ☸️ Kubernetes Deployment
-
-### Mit Helm installieren
-
-```bash
-helm install lan-party-manager ./helm/lan-party-manager
-```
-
-### Mit custom Values
-
-```bash
-helm install lan-party-manager ./helm/lan-party-manager -f custom-values.yaml
-```
-
-## 📡 API Endpoints
-
-| Methode | Endpoint | Beschreibung |
-|---------|----------|--------------|
-| GET | `/health` | Health Check |
-| GET | `/api/v1/events` | Alle Events abrufen |
-| GET | `/api/v1/events/:id` | Einzelnes Event |
-| POST | `/api/v1/events` | Event erstellen |
-| PUT | `/api/v1/events/:id` | Event aktualisieren |
-| DELETE | `/api/v1/events/:id` | Event löschen |
-| GET | `/api/v1/participants` | Alle Teilnehmer |
-| POST | `/api/v1/participants` | Teilnehmer erstellen |
 
 ## 🎨 Credits
 

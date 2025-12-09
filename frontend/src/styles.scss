@@ -389,27 +389,39 @@
 
 // Player card for voting
 .player-card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 24px 16px;
-  background: $bg-card;
-  border: 1px solid $border-color;
+  justify-content: flex-end;
+  aspect-ratio: 1;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border: 2px solid $border-color;
   border-radius: $radius-lg;
   cursor: pointer;
   transition: all $transition-fast;
+  overflow: hidden;
 
   &.selected {
     border-color: $accent-primary;
-    background: rgba($accent-primary, 0.05);
+    box-shadow: $shadow-glow;
   }
 
-  .player-avatar {
-    margin-bottom: 12px;
+  .player-name-overlay {
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.6) 60%, transparent 100%);
+    padding: 24px 12px 12px;
   }
 
   .player-name {
+    display: block;
     font-weight: 600;
     text-align: center;
+    color: $text-primary;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
