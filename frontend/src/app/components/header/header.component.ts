@@ -34,6 +34,10 @@ import { Subscription, interval } from 'rxjs';
                 <span class="nav-icon">🏆</span>
                 Leaderboard
               </a>
+              <a routerLink="/chat" routerLinkActive="active" class="nav-link">
+                <span class="nav-icon">💬</span>
+                Chat
+              </a>
               @if (isAdmin()) {
                 <a routerLink="/admin" routerLinkActive="active" class="nav-link admin-link">
                   <span class="nav-icon">⚙️</span>

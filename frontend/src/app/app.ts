@@ -7,6 +7,7 @@ import { LoadingOverlayComponent } from './components/loading-overlay/loading-ov
 import { AuthService } from './services/auth.service';
 import { WebSocketService } from './services/websocket.service';
 import { ConnectionStatusService } from './services/connection-status.service';
+import { AchievementService } from './services/achievement.service';
 
 @Component({
   selector: 'app-root',
@@ -19,6 +20,7 @@ export class App implements OnInit, OnDestroy {
   private authService = inject(AuthService);
   private wsService = inject(WebSocketService);
   private connectionStatus = inject(ConnectionStatusService);
+  private achievementService = inject(AchievementService);
 
   get isAuthenticated(): boolean {
     return this.authService.isAuthenticated();
@@ -49,6 +51,8 @@ export class App implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    // Load achievements cache for tooltips in chat
+    this.achievementService.loadCache();
   }
 
   ngOnDestroy(): void {

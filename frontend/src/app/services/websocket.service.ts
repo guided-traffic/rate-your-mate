@@ -2,7 +2,7 @@ import { Injectable, signal, inject } from '@angular/core';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 import { ConnectionStatusService } from './connection-status.service';
-import { WebSocketMessage, VotePayload, SettingsPayload, CreditActionPayload } from '../models/websocket.model';
+import { WebSocketMessage, VotePayload, SettingsPayload, CreditActionPayload, ChatMessagePayload } from '../models/websocket.model';
 import { Subject, Observable } from 'rxjs';
 
 @Injectable({
@@ -24,6 +24,7 @@ export class WebSocketService {
   readonly settingsUpdate$ = new Subject<SettingsPayload>();
   readonly creditsReset$ = new Subject<CreditActionPayload>();
   readonly creditsGiven$ = new Subject<CreditActionPayload>();
+  readonly chatMessage$ = new Subject<ChatMessagePayload>();
 
   // General messages observable for timeline component
   private messagesSubject = new Subject<{ type: string; payload: VotePayload }>();
@@ -105,7 +106,7 @@ export class WebSocketService {
     }
   }
 
-  private handleMessage(message: WebSocketMessage<VotePayload | SettingsPayload | CreditActionPayload>): void {
+  private handleMessage(message: WebSocketMessage<VotePayload | SettingsPayload | CreditActionPayload | ChatMessagePayload>): void {
     switch (message.type) {
       case 'new_vote':
         console.log('WebSocket: New vote received', message.payload);
@@ -123,6 +124,10 @@ export class WebSocketService {
       case 'credits_given':
         console.log('WebSocket: Credits given received', message.payload);
         this.creditsGiven$.next(message.payload as CreditActionPayload);
+        break;
+      case 'chat_message':
+        console.log('WebSocket: Chat message received', message.payload);
+        this.chatMessage$.next(message.payload as ChatMessagePayload);
         break;
       default:
         console.log('WebSocket: Unknown message type', message.type);

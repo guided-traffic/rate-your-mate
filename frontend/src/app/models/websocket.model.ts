@@ -1,4 +1,4 @@
-export type WebSocketMessageType = 'vote_received' | 'new_vote' | 'user_joined' | 'settings_update' | 'credits_reset' | 'credits_given' | 'error';
+export type WebSocketMessageType = 'vote_received' | 'new_vote' | 'user_joined' | 'settings_update' | 'credits_reset' | 'credits_given' | 'chat_message' | 'error';
 
 export interface WebSocketMessage<T = unknown> {
   type: WebSocketMessageType;
@@ -27,4 +27,22 @@ export interface SettingsPayload {
 
 export interface CreditActionPayload {
   message: string;
+}
+
+export interface ChatMessagePayload {
+  id: number;
+  user_id: number;
+  username: string;
+  steam_id: string;
+  avatar_small: string;
+  message: string;
+  achievements: Array<{
+    id: string;
+    name: string;
+    description: string;
+    image_url: string;
+    is_positive: boolean;
+    count: number;
+  }>;
+  created_at: string;
 }
