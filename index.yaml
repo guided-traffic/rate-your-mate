@@ -2,8 +2,27 @@ apiVersion: v1
 entries:
   lan-party-manager:
   - apiVersion: v2
+    appVersion: 1.4.6
+    created: "2025-12-09T10:28:20.231905916Z"
+    description: A Helm chart for the LAN Party Manager application
+    digest: f0ce85b7a2dfdb730b275b0634f31b4274ce170f63e990e3eddb155b15d22e58
+    home: https://github.com/guided-traffic/lan-party-manager
+    keywords:
+    - lan-party
+    - gaming
+    - event-management
+    maintainers:
+    - name: guided-traffic
+    name: lan-party-manager
+    sources:
+    - https://github.com/guided-traffic/lan-party-manager
+    type: application
+    urls:
+    - https://guided-traffic.github.io/lan-party-manager/lan-party-manager-1.4.6.tgz
+    version: 1.4.6
+  - apiVersion: v2
     appVersion: 1.4.5
-    created: "2025-12-09T10:16:04.1706796Z"
+    created: "2025-12-09T10:28:20.231303967Z"
     description: A Helm chart for the LAN Party Manager application
     digest: 45377f793fdadb90d442ae584da2c4f020ccca893c6117e539749555c3b956d0
     home: https://github.com/guided-traffic/lan-party-manager
@@ -22,7 +41,7 @@ entries:
     version: 1.4.5
   - apiVersion: v2
     appVersion: 1.4.4
-    created: "2025-12-09T10:16:04.170274402Z"
+    created: "2025-12-09T10:28:20.230766831Z"
     description: A Helm chart for the LAN Party Manager application
     digest: 0b70365414a70e35f977cfc94226af6e4d5643fbce86bca03376120bb1c43bf3
     home: https://github.com/guided-traffic/lan-party-manager
@@ -41,7 +60,7 @@ entries:
     version: 1.4.4
   - apiVersion: v2
     appVersion: 1.4.3
-    created: "2025-12-09T10:16:04.169883543Z"
+    created: "2025-12-09T10:28:20.230200171Z"
     description: A Helm chart for the LAN Party Manager application
     digest: b907f2365d623b12cd46cc9dcc85b31f66bb9cd0ba8d48b8c2ed815c185f59d8
     home: https://github.com/guided-traffic/lan-party-manager
@@ -60,7 +79,7 @@ entries:
     version: 1.4.3
   - apiVersion: v2
     appVersion: 1.4.2
-    created: "2025-12-09T10:16:04.169450204Z"
+    created: "2025-12-09T10:28:20.229783543Z"
     description: A Helm chart for the LAN Party Manager application
     digest: 56503aed027e21a65231c86d376b8217c1a6a1cfcd13c3bc3d81e9598181b0ce
     home: https://github.com/guided-traffic/lan-party-manager
@@ -79,7 +98,7 @@ entries:
     version: 1.4.2
   - apiVersion: v2
     appVersion: 1.4.1
-    created: "2025-12-09T10:16:04.169066869Z"
+    created: "2025-12-09T10:28:20.229278438Z"
     description: A Helm chart for the LAN Party Manager application
     digest: b840629a5784cf8876b23b0e23d16b372886727b8355a63147d957d7bb3eacc9
     home: https://github.com/guided-traffic/lan-party-manager
@@ -98,7 +117,7 @@ entries:
     version: 1.4.1
   - apiVersion: v2
     appVersion: 1.4.0
-    created: "2025-12-09T10:16:04.168475572Z"
+    created: "2025-12-09T10:28:20.228871958Z"
     description: A Helm chart for the LAN Party Manager application
     digest: 7a882160d7179d8007fce41a38847ef0453535b607760383393cbc5764b0a9c8
     home: https://github.com/guided-traffic/lan-party-manager
@@ -117,7 +136,7 @@ entries:
     version: 1.4.0
   - apiVersion: v2
     appVersion: 1.3.0
-    created: "2025-12-09T10:16:04.167506108Z"
+    created: "2025-12-09T10:28:20.228432828Z"
     description: A Helm chart for the LAN Party Manager application
     digest: 9df6516f6533578fd598ad638e74be6bfdae1aee04c0d337465be0d1bfc6d627
     home: https://github.com/guided-traffic/lan-party-manager
@@ -136,7 +155,7 @@ entries:
     version: 1.3.0
   - apiVersion: v2
     appVersion: 1.2.3
-    created: "2025-12-09T10:16:04.166968963Z"
+    created: "2025-12-09T10:28:20.227858442Z"
     description: A Helm chart for the LAN Party Manager application
     digest: 6fcfcbf279d0f03b2586c3fdb5a45ac34cc0b479be7c7aa0ba5dc3e3acbfc2a1
     home: https://github.com/guided-traffic/lan-party-manager
@@ -155,7 +174,7 @@ entries:
     version: 1.2.3
   - apiVersion: v2
     appVersion: 1.2.2
-    created: "2025-12-09T10:16:04.166556733Z"
+    created: "2025-12-09T10:28:20.226866467Z"
     description: A Helm chart for the LAN Party Manager application
     digest: cf0a746fc2a7ad6e092946a03a5a92c94bc4494d801d246243410526f8b2f285
     home: https://github.com/guided-traffic/lan-party-manager
@@ -174,7 +193,7 @@ entries:
     version: 1.2.2
   - apiVersion: v2
     appVersion: 1.2.1
-    created: "2025-12-09T10:16:04.166158671Z"
+    created: "2025-12-09T10:28:20.226419461Z"
     description: A Helm chart for the LAN Party Manager application
     digest: b52f4a7dfe85557da7a688c3cd7111dbf121f9ec1f12a577550c766e166a68e9
     home: https://github.com/guided-traffic/lan-party-manager
@@ -193,7 +212,7 @@ entries:
     version: 1.2.1
   - apiVersion: v2
     appVersion: 1.2.0
-    created: "2025-12-09T10:16:04.165766238Z"
+    created: "2025-12-09T10:28:20.225930165Z"
     description: A Helm chart for the LAN Party Manager application
     digest: 013279e80198cfc3577e79ffd7c006c23949c675569a20c72bd6482cd90a7ac9
     home: https://github.com/guided-traffic/lan-party-manager
@@ -210,4 +229,4 @@ entries:
     urls:
     - https://guided-traffic.github.io/lan-party-manager/lan-party-manager-1.2.0.tgz
     version: 1.2.0
-generated: "2025-12-09T10:16:04.165129214Z"
+generated: "2025-12-09T10:28:20.225273184Z"
