@@ -52,6 +52,9 @@ func (h *AuthHandler) SteamLogin(c *gin.Context) {
 		return
 	}
 
+	log.Printf("Steam Auth URL (return_to callback): %s", authURL)
+	log.Printf("Configured Backend URL: %s", h.cfg.BackendURL)
+
 	// Redirect to Steam login page
 	c.Redirect(http.StatusTemporaryRedirect, authURL)
 }
@@ -59,13 +62,17 @@ func (h *AuthHandler) SteamLogin(c *gin.Context) {
 // SteamCallback handles the Steam OpenID callback
 // GET /api/v1/auth/steam/callback
 func (h *AuthHandler) SteamCallback(c *gin.Context) {
-	// Build the full callback URL from the request
-	fullURL := auth.BuildFullCallbackURL(c.Request)
+	// Build the full callback URL using the configured backend URL
+	// This ensures the URL matches what was sent to Steam in the initial request
+	fullURL := h.steamAuth.BuildCallbackURLFromConfig(c.Request)
+
+	log.Printf("Steam Callback received - Full URL: %s", fullURL)
 
 	// Validate the OpenID response and extract Steam ID
 	steamID, err := h.steamAuth.ValidateCallback(fullURL)
 	if err != nil {
 		log.Printf("Steam callback validation failed: %v", err)
+		log.Printf("This usually means the callback URL doesn't match the return_to URL sent to Steam!")
 		h.redirectWithError(c, "Steam authentication failed")
 		return
 	}

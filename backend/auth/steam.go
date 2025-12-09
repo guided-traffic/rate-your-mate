@@ -17,6 +17,7 @@ const (
 // SteamAuth handles Steam OpenID authentication
 type SteamAuth struct {
 	callbackURL string
+	backendURL  string
 	nonceStore  openid.NonceStore
 	discovery   openid.DiscoveryCache
 }
@@ -25,6 +26,7 @@ type SteamAuth struct {
 func NewSteamAuth(backendURL string) *SteamAuth {
 	return &SteamAuth{
 		callbackURL: backendURL + "/api/v1/auth/steam/callback",
+		backendURL:  backendURL,
 		nonceStore:  openid.NewSimpleNonceStore(),
 		discovery:   openid.NewSimpleDiscoveryCache(),
 	}
@@ -71,6 +73,7 @@ func extractSteamID(openIDIdentity string) (string, error) {
 }
 
 // BuildFullCallbackURL constructs the full callback URL from the request
+// DEPRECATED: Use BuildCallbackURLFromConfig instead for correct URL in reverse proxy scenarios
 func BuildFullCallbackURL(r *http.Request) string {
 	scheme := "http"
 	if r.TLS != nil {
@@ -96,6 +99,13 @@ func BuildFullCallbackURL(r *http.Request) string {
 	}
 
 	return fullURL.String()
+}
+
+// BuildCallbackURLFromConfig builds the callback URL using the configured backend URL
+// This is more reliable in reverse proxy/Kubernetes scenarios
+func (s *SteamAuth) BuildCallbackURLFromConfig(r *http.Request) string {
+	// Use the configured backend URL as base, append the path and query params
+	return s.callbackURL + "?" + r.URL.RawQuery
 }
 
 // ParseSteamID64 validates that a string is a valid Steam ID 64
