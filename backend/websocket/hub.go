@@ -24,6 +24,8 @@ const (
 	MessageTypeCreditsReset MessageType = "credits_reset"
 	// MessageTypeCreditsGiven is sent when admin gives everyone a credit
 	MessageTypeCreditsGiven MessageType = "credits_given"
+	// MessageTypeChatMessage is sent when a new chat message is posted
+	MessageTypeChatMessage MessageType = "chat_message"
 	// MessageTypeError is sent when an error occurs
 	MessageTypeError MessageType = "error"
 )
@@ -54,6 +56,18 @@ type SettingsPayload struct {
 	CreditIntervalMinutes int  `json:"credit_interval_minutes"`
 	CreditMax             int  `json:"credit_max"`
 	VotingPaused          bool `json:"voting_paused"`
+}
+
+// ChatMessagePayload contains chat message information for broadcasts
+type ChatMessagePayload struct {
+	ID           uint64        `json:"id"`
+	UserID       uint64        `json:"user_id"`
+	Username     string        `json:"username"`
+	SteamID      string        `json:"steam_id"`
+	AvatarSmall  string        `json:"avatar_small"`
+	Message      string        `json:"message"`
+	Achievements interface{}   `json:"achievements"` // Achievement badges at time of message
+	CreatedAt    string        `json:"created_at"`
 }
 
 // Client represents a connected WebSocket client
@@ -260,4 +274,21 @@ func (h *Hub) BroadcastCreditsGiven() {
 
 	h.broadcast <- data
 	log.Printf("WebSocket: Broadcasted credits given to all clients")
+}
+
+// BroadcastChatMessage sends a new chat message to all clients
+func (h *Hub) BroadcastChatMessage(payload *ChatMessagePayload) {
+	msg := Message{
+		Type:    MessageTypeChatMessage,
+		Payload: payload,
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		log.Printf("WebSocket: Failed to marshal chat message: %v", err)
+		return
+	}
+
+	log.Printf("WebSocket: Broadcasting chat_message to %d clients", h.GetConnectedUserCount())
+	h.broadcast <- data
 }

@@ -37,6 +37,7 @@ func main() {
 	// Initialize repositories
 	userRepo := repository.NewUserRepository()
 	voteRepo := repository.NewVoteRepository()
+	chatRepo := repository.NewChatRepository()
 
 	// Initialize services
 	creditService := services.NewCreditService(cfg, userRepo)
@@ -48,6 +49,7 @@ func main() {
 	voteHandler := handlers.NewVoteHandler(voteRepo, userRepo, creditService, wsHub, cfg)
 	wsHandler := handlers.NewWebSocketHandler(wsHub, authHandler.GetJWTService())
 	settingsHandler := handlers.NewSettingsHandler(cfg, wsHub, userRepo)
+	chatHandler := handlers.NewChatHandler(chatRepo, userRepo, wsHub)
 
 	r := gin.Default()
 
@@ -100,6 +102,10 @@ func main() {
 			// Votes
 			protected.POST("/votes", voteHandler.Create)
 			protected.GET("/votes", voteHandler.GetTimeline)
+
+			// Chat
+			protected.GET("/chat", chatHandler.GetMessages)
+			protected.POST("/chat", chatHandler.Create)
 
 			// Voting status (public for authenticated users)
 			protected.GET("/voting-status", settingsHandler.GetVotingStatus)

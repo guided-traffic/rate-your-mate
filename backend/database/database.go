@@ -90,6 +90,18 @@ func runMigrations() error {
 
 		// Index for timeline queries
 		`CREATE INDEX IF NOT EXISTS idx_votes_timeline ON votes(created_at DESC)`,
+
+		// Chat messages table
+		`CREATE TABLE IF NOT EXISTS chat_messages (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL REFERENCES users(id),
+			message TEXT NOT NULL,
+			achievements TEXT DEFAULT '[]',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+
+		// Index for chat timeline queries
+		`CREATE INDEX IF NOT EXISTS idx_chat_messages_timeline ON chat_messages(created_at DESC)`,
 	}
 
 	for _, migration := range migrations {
