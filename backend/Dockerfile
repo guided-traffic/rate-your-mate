@@ -1,28 +1,66 @@
 # Build stage
 FROM golang:1.25-alpine AS builder
 
+# Build arguments for metadata
+ARG BUILD_NUMBER
+ARG GIT_COMMIT
+ARG BUILD_TIME
+
+# Set build arguments for cross-compilation
+ARG TARGETOS
+ARG TARGETARCH
+
+# Set working directory
 WORKDIR /app
 
-# Copy go mod files
+# Install build dependencies
+RUN apk add --no-cache git ca-certificates
+
+# Copy go mod and sum files
 COPY go.mod go.sum ./
+
+# Download dependencies
 RUN go mod download
 
 # Copy source code
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+# Build the application with cross-compilation support
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
+    go build -a -installsuffix cgo \
+    -ldflags="-w -s -X main.version=${BUILD_NUMBER:-dev} -X main.commit=${GIT_COMMIT:-unknown} -X main.buildTime=${BUILD_TIME:-unknown}" \
+    -o main .
 
-# Final stage
-FROM alpine:3.23
+# Final stage - using distroless for minimal attack surface
+FROM gcr.io/distroless/static-debian12:nonroot
 
-RUN apk --no-cache add ca-certificates
+# Build arguments for metadata
+ARG BUILD_NUMBER
+ARG GIT_COMMIT
+ARG BUILD_TIME
 
-WORKDIR /root/
+# Add OCI labels for better metadata
+LABEL org.opencontainers.image.title="LAN Party Manager Backend" \
+      org.opencontainers.image.description="Backend for LAN Party Manager - Achievement voting system" \
+      org.opencontainers.image.vendor="Guided Traffic" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.documentation="https://github.com/guided-traffic/lan-party-manager" \
+      org.opencontainers.image.source="https://github.com/guided-traffic/lan-party-manager" \
+      org.opencontainers.image.version="${BUILD_NUMBER:-dev}" \
+      org.opencontainers.image.revision="${GIT_COMMIT:-unknown}" \
+      org.opencontainers.image.created="${BUILD_TIME:-unknown}"
 
-# Copy the binary from builder
+# distroless images run as non-root user 65532 (nonroot) by default
+# distroless includes ca-certificates and tzdata
+
+WORKDIR /app
 COPY --from=builder /app/main .
+
+# Create data directory for SQLite (will be mounted as volume)
+# Note: distroless doesn't have mkdir, so we copy an empty dir or use volume mount
+
+USER 65532:65532
 
 EXPOSE 8080
 
-CMD ["./main"]
+ENTRYPOINT ["/app/main"]
