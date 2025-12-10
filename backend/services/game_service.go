@@ -217,9 +217,20 @@ func (s *GameService) fetchMultiplayerGames() (*models.GamesResponse, error) {
 		}
 	}
 
-	// Sort pinned games by name
+	// Sort pinned games by their order in the config (not alphabetically)
 	sort.Slice(pinnedGames, func(i, j int) bool {
-		return pinnedGames[i].Name < pinnedGames[j].Name
+		// Find index of each game in pinnedGameIDs
+		indexI := -1
+		indexJ := -1
+		for idx, id := range pinnedGameIDs {
+			if id == pinnedGames[i].AppID {
+				indexI = idx
+			}
+			if id == pinnedGames[j].AppID {
+				indexJ = idx
+			}
+		}
+		return indexI < indexJ
 	})
 
 	return &models.GamesResponse{
