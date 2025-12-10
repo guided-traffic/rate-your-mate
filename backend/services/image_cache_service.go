@@ -84,13 +84,13 @@ func (s *ImageCacheService) CacheImage(appID int) bool {
 	imageURL := s.GetSteamImageURL(appID)
 	resp, err := s.httpClient.Get(imageURL)
 	if err != nil {
-		log.Printf("Failed to download image for game %d: %v", appID, err)
+		log.Printf("Failed to download image for game %d from %s: %v", appID, imageURL, err)
 		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("Failed to download image for game %d: HTTP %d", appID, resp.StatusCode)
+		log.Printf("Failed to download image for game %d from %s: HTTP %d", appID, imageURL, resp.StatusCode)
 		return false
 	}
 
