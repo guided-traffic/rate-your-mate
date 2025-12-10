@@ -21,8 +21,9 @@ const (
 	steamCDNBaseURL   = "https://steamcdn-a.akamaihd.net/steam/apps"
 
 	// Cache settings
-	gameCacheMaxAge      = 24 * time.Hour // Refresh game data after 24 hours
-	rateLimitPausePeriod = 5 * time.Minute // Pause for 5 minutes after 429 error
+	gameCacheMaxAge       = 24 * time.Hour  // Refresh game data after 24 hours
+	failedFetchRetryDelay = 24 * time.Hour  // Wait 24 hours before retrying failed fetches (e.g., removed games)
+	rateLimitPausePeriod  = 5 * time.Minute // Pause for 5 minutes after 429 error
 )
 
 // GameService handles game-related operations
@@ -201,15 +202,26 @@ func (s *GameService) fetchMultiplayerGames() (*models.GamesResponse, error) {
 			// Check DB cache again (might have been populated by another goroutine)
 			cached, err := s.gameCacheRepo.GetByAppID(game.AppID)
 			if err == nil && cached != nil && !cached.IsStale(gameCacheMaxAge) {
-				game.Categories = cached.GetCategories()
-				if cached.Name != "" {
-					game.Name = cached.Name
+				// Check if this was a failed fetch that we should skip
+				if cached.FetchFailed {
+					// Skip games that failed to fetch and are still within retry delay
+					if !cached.IsStale(failedFetchRetryDelay) {
+						log.Printf("Skipping unavailable game %s (%d) - will retry after %v", game.Name, game.AppID, failedFetchRetryDelay)
+						continue
+					}
+					// Retry delay expired, try fetching again
+					gamesToFetch = append(gamesToFetch, game)
+				} else {
+					game.Categories = cached.GetCategories()
+					if cached.Name != "" {
+						game.Name = cached.Name
+					}
+					game.IsFree = cached.IsFree
+					game.PriceCents = cached.PriceCents
+					game.OriginalCents = cached.OriginalCents
+					game.DiscountPercent = cached.DiscountPercent
+					game.PriceFormatted = cached.PriceFormatted
 				}
-				game.IsFree = cached.IsFree
-				game.PriceCents = cached.PriceCents
-				game.OriginalCents = cached.OriginalCents
-				game.DiscountPercent = cached.DiscountPercent
-				game.PriceFormatted = cached.PriceFormatted
 			} else {
 				gamesToFetch = append(gamesToFetch, game)
 			}
@@ -412,6 +424,15 @@ func (s *GameService) fetchGameCategories(games []*models.Game) {
 		storeData, err := s.fetchGameCategoriesFromStore(game.AppID)
 		if err != nil {
 			log.Printf("Could not fetch data for %s (%d): %v", game.Name, game.AppID, err)
+
+			// Check if this is a "game not found" error (not a rate limit or network error)
+			// Cache the failure so we don't retry for 24 hours
+			if strings.Contains(err.Error(), "game not found") || strings.Contains(err.Error(), "not accessible") {
+				log.Printf("Game %s (%d) appears to be unavailable (removed from Steam Store?) - caching failure for %v", game.Name, game.AppID, failedFetchRetryDelay)
+				if cacheErr := s.gameCacheRepo.UpsertWithStatus(game.AppID, game.Name, []string{}, nil, true); cacheErr != nil {
+					log.Printf("Failed to cache failed fetch for game %d: %v", game.AppID, cacheErr)
+				}
+			}
 			continue
 		}
 
@@ -521,22 +542,31 @@ func (s *GameService) fetchGameDetails(appID int) (*models.Game, error) {
 	// First try DB cache
 	cached, err := s.gameCacheRepo.GetByAppID(appID)
 	if err == nil && cached != nil && !cached.IsStale(gameCacheMaxAge) {
-		// For cached games, try to cache image asynchronously using old CDN URL as fallback
-		s.imageCacheService.CacheImageAsync(appID)
-		return &models.Game{
-			AppID:           appID,
-			Name:            cached.Name,
-			HeaderImageURL:  s.imageCacheService.GetLocalImageURL(appID),
-			CapsuleImageURL: fmt.Sprintf("%s/%d/capsule_231x87.jpg", steamCDNBaseURL, appID),
-			Categories:      cached.GetCategories(),
-			OwnerCount:      0,
-			Owners:          []string{},
-			IsFree:          cached.IsFree,
-			PriceCents:      cached.PriceCents,
-			OriginalCents:   cached.OriginalCents,
-			DiscountPercent: cached.DiscountPercent,
-			PriceFormatted:  cached.PriceFormatted,
-		}, nil
+		// Check if this was a failed fetch - skip unavailable games
+		if cached.FetchFailed {
+			if !cached.IsStale(failedFetchRetryDelay) {
+				log.Printf("Skipping unavailable pinned game (%d) - will retry after %v", appID, failedFetchRetryDelay)
+				return nil, fmt.Errorf("game unavailable (cached failure)")
+			}
+			// Retry delay expired, continue to fetch again below
+		} else {
+			// For cached games, try to cache image asynchronously using old CDN URL as fallback
+			s.imageCacheService.CacheImageAsync(appID)
+			return &models.Game{
+				AppID:           appID,
+				Name:            cached.Name,
+				HeaderImageURL:  s.imageCacheService.GetLocalImageURL(appID),
+				CapsuleImageURL: fmt.Sprintf("%s/%d/capsule_231x87.jpg", steamCDNBaseURL, appID),
+				Categories:      cached.GetCategories(),
+				OwnerCount:      0,
+				Owners:          []string{},
+				IsFree:          cached.IsFree,
+				PriceCents:      cached.PriceCents,
+				OriginalCents:   cached.OriginalCents,
+				DiscountPercent: cached.DiscountPercent,
+				PriceFormatted:  cached.PriceFormatted,
+			}, nil
+		}
 	}
 
 	// Check rate limit
@@ -564,6 +594,13 @@ func (s *GameService) fetchGameDetails(appID int) (*models.Game, error) {
 	// Fetch from Steam Store API
 	storeData, err := s.fetchGameCategoriesFromStore(appID)
 	if err != nil {
+		// Cache the failure if it's a "game not found" error
+		if strings.Contains(err.Error(), "game not found") || strings.Contains(err.Error(), "not accessible") {
+			log.Printf("Pinned game (%d) appears to be unavailable - caching failure for %v", appID, failedFetchRetryDelay)
+			if cacheErr := s.gameCacheRepo.UpsertWithStatus(appID, fmt.Sprintf("Unknown Game %d", appID), []string{}, nil, true); cacheErr != nil {
+				log.Printf("Failed to cache failed fetch for pinned game %d: %v", appID, cacheErr)
+			}
+		}
 		return nil, err
 	}
 

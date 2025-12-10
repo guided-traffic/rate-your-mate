@@ -229,6 +229,7 @@ func runMigrations() error {
 			original_cents INTEGER DEFAULT 0,
 			discount_percent INTEGER DEFAULT 0,
 			price_formatted TEXT DEFAULT '',
+			fetch_failed INTEGER DEFAULT 0,
 			fetched_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,
 
@@ -241,6 +242,9 @@ func runMigrations() error {
 		`ALTER TABLE game_cache ADD COLUMN original_cents INTEGER DEFAULT 0`,
 		`ALTER TABLE game_cache ADD COLUMN discount_percent INTEGER DEFAULT 0`,
 		`ALTER TABLE game_cache ADD COLUMN price_formatted TEXT DEFAULT ''`,
+
+		// Add fetch_failed column for games that couldn't be fetched (e.g., removed from Steam Store)
+		`ALTER TABLE game_cache ADD COLUMN fetch_failed INTEGER DEFAULT 0`,
 
 		// Fix any NULL last_credit_at values (can happen from failed migrations)
 		`UPDATE users SET last_credit_at = CURRENT_TIMESTAMP WHERE last_credit_at IS NULL`,
