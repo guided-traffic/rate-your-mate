@@ -169,8 +169,7 @@ func (s *GameService) fetchMultiplayerGames() (*models.GamesResponse, error) {
 						Categories:      []string{},
 					}
 
-					// Cache the image asynchronously
-					s.imageCacheService.CacheImageAsync(g.AppID)
+					// Note: Image caching is deferred until after multiplayer filtering
 
 					// Try to load categories from DB cache
 					cached, err := s.gameCacheRepo.GetByAppID(g.AppID)
@@ -221,6 +220,9 @@ func (s *GameService) fetchMultiplayerGames() (*models.GamesResponse, error) {
 
 	for _, game := range gameMap {
 		if game.HasMultiplayerCategory() {
+			// Only cache images for multiplayer games (after filtering)
+			s.imageCacheService.CacheImageAsync(game.AppID)
+
 			// Check if pinned
 			for _, pinnedID := range pinnedGameIDs {
 				if pinnedID == game.AppID {
