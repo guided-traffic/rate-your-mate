@@ -5,7 +5,7 @@ import { adminGuard } from './guards/admin.guard';
 export const routes: Routes = [
   {
     path: '',
-    redirectTo: 'timeline',
+    redirectTo: 'games',
     pathMatch: 'full'
   },
   {

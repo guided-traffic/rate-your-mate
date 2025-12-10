@@ -1,5 +1,5 @@
 import { Component, inject, OnInit, OnDestroy, effect } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { RouterOutlet, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { HeaderComponent } from './components/header/header.component';
 import { NotificationsComponent } from './components/notifications/notifications.component';
@@ -12,7 +12,7 @@ import { AchievementService } from './services/achievement.service';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, HeaderComponent, NotificationsComponent, LoadingOverlayComponent],
+  imports: [CommonModule, RouterOutlet, RouterLink, HeaderComponent, NotificationsComponent, LoadingOverlayComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })

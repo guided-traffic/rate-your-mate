@@ -23,6 +23,14 @@ import { Subscription, interval } from 'rxjs';
 
           @if (auth.isAuthenticated()) {
             <nav class="nav">
+              <a routerLink="/games" routerLinkActive="active" class="nav-link">
+                <span class="nav-icon">🎮</span>
+                Games
+              </a>
+              <a routerLink="/leaderboard" routerLinkActive="active" class="nav-link">
+                <span class="nav-icon">🏆</span>
+                Leaderboard
+              </a>
               <a routerLink="/rate" routerLinkActive="active" class="nav-link">
                 <span class="nav-icon">⭐</span>
                 Rate Player
@@ -30,18 +38,6 @@ import { Subscription, interval } from 'rxjs';
               <a routerLink="/timeline" routerLinkActive="active" class="nav-link">
                 <span class="nav-icon">📜</span>
                 Timeline
-              </a>
-              <a routerLink="/leaderboard" routerLinkActive="active" class="nav-link">
-                <span class="nav-icon">🏆</span>
-                Leaderboard
-              </a>
-              <a routerLink="/chat" routerLinkActive="active" class="nav-link">
-                <span class="nav-icon">💬</span>
-                Chat
-              </a>
-              <a routerLink="/games" routerLinkActive="active" class="nav-link">
-                <span class="nav-icon">🎮</span>
-                Games
               </a>
             </nav>
           }

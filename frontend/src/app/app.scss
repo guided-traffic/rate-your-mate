@@ -13,3 +13,35 @@ main {
     padding-top: 80px; // Header height + margin
   }
 }
+
+.chat-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: $gradient-primary;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  box-shadow: 0 4px 16px rgba($accent-primary, 0.4);
+  transition: all 0.2s ease;
+  z-index: 99;
+  cursor: pointer;
+
+  &:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 24px rgba($accent-primary, 0.5);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  .chat-fab-icon {
+    font-size: 24px;
+    line-height: 1;
+  }
+}

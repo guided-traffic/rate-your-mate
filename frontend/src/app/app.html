@@ -9,3 +9,9 @@
 </main>
 
 <app-notifications />
+
+@if (isAuthenticated) {
+  <a routerLink="/chat" class="chat-fab" title="Chat">
+    <span class="chat-fab-icon">💬</span>
+  </a>
+}
