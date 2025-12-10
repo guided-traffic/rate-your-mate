@@ -46,12 +46,12 @@ func main() {
 	userRepo := repository.NewUserRepository()
 	voteRepo := repository.NewVoteRepository()
 	chatRepo := repository.NewChatRepository()
+	gameCacheRepo := repository.NewGameCacheRepository()
 
 	// Initialize services
 	creditService := services.NewCreditService(cfg, userRepo)
-
-	// Initialize services
-	gameService := services.NewGameService(cfg, userRepo)
+	imageCacheService := services.NewImageCacheService()
+	gameService := services.NewGameService(cfg, userRepo, gameCacheRepo, imageCacheService)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(cfg, userRepo, creditService)
@@ -61,7 +61,7 @@ func main() {
 	wsHandler := handlers.NewWebSocketHandler(wsHub, authHandler.GetJWTService())
 	settingsHandler := handlers.NewSettingsHandler(cfg, wsHub, userRepo)
 	chatHandler := handlers.NewChatHandler(chatRepo, userRepo, wsHub)
-	gameHandler := handlers.NewGameHandler(gameService)
+	gameHandler := handlers.NewGameHandler(gameService, imageCacheService)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -98,6 +98,9 @@ func main() {
 		// Achievements (public)
 		api.GET("/achievements", achievementHandler.GetAll)
 		api.GET("/achievements/:id", achievementHandler.GetByID)
+
+		// Game images (public - allows caching by browsers/CDNs)
+		api.GET("/games/images/:filename", gameHandler.ServeGameImage)
 
 		// WebSocket endpoint (token passed as query param)
 		api.GET("/ws", wsHandler.HandleConnection)

@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"net/http"
+	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/guided-traffic/lan-party-manager/backend/services"
@@ -9,13 +12,15 @@ import (
 
 // GameHandler handles game-related HTTP requests
 type GameHandler struct {
-	gameService *services.GameService
+	gameService       *services.GameService
+	imageCacheService *services.ImageCacheService
 }
 
 // NewGameHandler creates a new game handler
-func NewGameHandler(gameService *services.GameService) *GameHandler {
+func NewGameHandler(gameService *services.GameService, imageCacheService *services.ImageCacheService) *GameHandler {
 	return &GameHandler{
-		gameService: gameService,
+		gameService:       gameService,
+		imageCacheService: imageCacheService,
 	}
 }
 
@@ -47,4 +52,40 @@ func (h *GameHandler) RefreshGames(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, games)
+}
+
+// ServeGameImage serves a cached game image
+// GET /api/v1/games/images/:filename
+func (h *GameHandler) ServeGameImage(c *gin.Context) {
+	filename := c.Param("filename")
+
+	// Validate filename format (must be <appid>.jpg)
+	if !strings.HasSuffix(filename, ".jpg") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid image format"})
+		return
+	}
+
+	// Extract app ID from filename
+	appIDStr := strings.TrimSuffix(filename, ".jpg")
+	appID, err := strconv.Atoi(appIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid app ID"})
+		return
+	}
+
+	// Check if image exists locally
+	imagePath := h.imageCacheService.GetImagePath(appID)
+
+	// If not cached, try to cache it now
+	if !h.imageCacheService.HasImage(appID) {
+		if !h.imageCacheService.CacheImage(appID) {
+			// Redirect to Steam CDN as fallback
+			c.Redirect(http.StatusTemporaryRedirect, h.imageCacheService.GetSteamImageURL(appID))
+			return
+		}
+	}
+
+	// Serve the cached image
+	c.Header("Cache-Control", "public, max-age=86400") // Cache for 24 hours
+	c.File(filepath.Clean(imagePath))
 }

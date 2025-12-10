@@ -107,6 +107,17 @@ func runMigrations() error {
 		// Index for chat timeline queries
 		`CREATE INDEX IF NOT EXISTS idx_chat_messages_timeline ON chat_messages(created_at DESC)`,
 
+		// Game cache table for Steam Store data
+		`CREATE TABLE IF NOT EXISTS game_cache (
+			app_id INTEGER PRIMARY KEY,
+			name TEXT NOT NULL,
+			categories TEXT DEFAULT '[]',
+			fetched_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+
+		// Index for stale game lookups
+		`CREATE INDEX IF NOT EXISTS idx_game_cache_fetched ON game_cache(fetched_at)`,
+
 		// Fix any NULL last_credit_at values (can happen from failed migrations)
 		`UPDATE users SET last_credit_at = CURRENT_TIMESTAMP WHERE last_credit_at IS NULL`,
 	}

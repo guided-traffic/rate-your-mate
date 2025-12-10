@@ -19,38 +19,55 @@ const (
 	steamAPIBaseURL   = "https://api.steampowered.com"
 	steamStoreBaseURL = "https://store.steampowered.com/api"
 	steamCDNBaseURL   = "https://steamcdn-a.akamaihd.net/steam/apps"
+
+	// Cache settings
+	gameCacheMaxAge      = 24 * time.Hour // Refresh game data after 24 hours
+	rateLimitPausePeriod = 5 * time.Minute // Pause for 5 minutes after 429 error
 )
 
 // GameService handles game-related operations
 type GameService struct {
-	cfg        *config.Config
-	userRepo   *repository.UserRepository
-	httpClient *http.Client
-	cache      *gamesCache
+	cfg               *config.Config
+	userRepo          *repository.UserRepository
+	gameCacheRepo     *repository.GameCacheRepository
+	imageCacheService *ImageCacheService
+	httpClient        *http.Client
+	cache             *gamesCache
+	rateLimiter       *rateLimiter
 }
 
-// gamesCache caches game data to avoid excessive API calls
+// gamesCache caches the full response to avoid rebuilding it constantly
 type gamesCache struct {
 	mu        sync.RWMutex
 	games     *models.GamesResponse
 	expiresAt time.Time
 }
 
+// rateLimiter tracks rate limit status
+type rateLimiter struct {
+	mu          sync.RWMutex
+	pausedUntil time.Time
+	isPaused    bool
+}
+
 // NewGameService creates a new game service
-func NewGameService(cfg *config.Config, userRepo *repository.UserRepository) *GameService {
+func NewGameService(cfg *config.Config, userRepo *repository.UserRepository, gameCacheRepo *repository.GameCacheRepository, imageCacheService *ImageCacheService) *GameService {
 	return &GameService{
-		cfg:      cfg,
-		userRepo: userRepo,
+		cfg:               cfg,
+		userRepo:          userRepo,
+		gameCacheRepo:     gameCacheRepo,
+		imageCacheService: imageCacheService,
 		httpClient: &http.Client{
 			Timeout: 15 * time.Second,
 		},
-		cache: &gamesCache{},
+		cache:       &gamesCache{},
+		rateLimiter: &rateLimiter{},
 	}
 }
 
 // GetMultiplayerGames returns all multiplayer games owned by registered players
 func (s *GameService) GetMultiplayerGames() (*models.GamesResponse, error) {
-	// Check cache first (5 minute TTL)
+	// Check in-memory cache first (5 minute TTL for response assembly)
 	s.cache.mu.RLock()
 	if s.cache.games != nil && time.Now().Before(s.cache.expiresAt) {
 		cached := s.cache.games
@@ -65,7 +82,7 @@ func (s *GameService) GetMultiplayerGames() (*models.GamesResponse, error) {
 		return nil, err
 	}
 
-	// Update cache
+	// Update in-memory cache
 	s.cache.mu.Lock()
 	s.cache.games = games
 	s.cache.expiresAt = time.Now().Add(5 * time.Minute)
@@ -74,12 +91,28 @@ func (s *GameService) GetMultiplayerGames() (*models.GamesResponse, error) {
 	return games, nil
 }
 
-// InvalidateCache clears the games cache
+// InvalidateCache clears the in-memory games cache (DB cache remains)
 func (s *GameService) InvalidateCache() {
 	s.cache.mu.Lock()
 	s.cache.games = nil
 	s.cache.expiresAt = time.Time{}
 	s.cache.mu.Unlock()
+}
+
+// isRateLimited checks if we're currently rate limited
+func (s *GameService) isRateLimited() bool {
+	s.rateLimiter.mu.RLock()
+	defer s.rateLimiter.mu.RUnlock()
+	return s.rateLimiter.isPaused && time.Now().Before(s.rateLimiter.pausedUntil)
+}
+
+// setRateLimited sets the rate limit pause
+func (s *GameService) setRateLimited() {
+	s.rateLimiter.mu.Lock()
+	defer s.rateLimiter.mu.Unlock()
+	s.rateLimiter.isPaused = true
+	s.rateLimiter.pausedUntil = time.Now().Add(rateLimitPausePeriod)
+	log.Printf("Steam API rate limited - pausing requests for %v", rateLimitPausePeriod)
 }
 
 // fetchMultiplayerGames fetches all games from all users and filters for multiplayer
@@ -124,17 +157,30 @@ func (s *GameService) fetchMultiplayerGames() (*models.GamesResponse, error) {
 						existing.PlaytimeForever = g.PlaytimeForever
 					}
 				} else {
-					// New game
+					// New game - try to load from DB cache first
 					game := &models.Game{
 						AppID:           g.AppID,
 						Name:            g.Name,
-						HeaderImageURL:  fmt.Sprintf("%s/%d/header.jpg", steamCDNBaseURL, g.AppID),
+						HeaderImageURL:  s.imageCacheService.GetLocalImageURL(g.AppID),
 						CapsuleImageURL: fmt.Sprintf("%s/%d/capsule_231x87.jpg", steamCDNBaseURL, g.AppID),
 						PlaytimeForever: g.PlaytimeForever,
 						OwnerCount:      1,
 						Owners:          []string{steamID},
 						Categories:      []string{},
 					}
+
+					// Cache the image asynchronously
+					s.imageCacheService.CacheImageAsync(g.AppID)
+
+					// Try to load categories from DB cache
+					cached, err := s.gameCacheRepo.GetByAppID(g.AppID)
+					if err == nil && cached != nil && !cached.IsStale(gameCacheMaxAge) {
+						game.Categories = cached.GetCategories()
+						if cached.Name != "" {
+							game.Name = cached.Name
+						}
+					}
+
 					gameMap[g.AppID] = game
 				}
 			}
@@ -144,18 +190,30 @@ func (s *GameService) fetchMultiplayerGames() (*models.GamesResponse, error) {
 
 	wg.Wait()
 
-	// Now fetch categories for games owned by multiple players first
-	// Sort games by owner count to prioritize fetching details for popular games
-	var gamesToCheck []*models.Game
+	// Identify games that need their categories fetched from Steam Store API
+	var gamesToFetch []*models.Game
 	for _, game := range gameMap {
-		gamesToCheck = append(gamesToCheck, game)
+		if len(game.Categories) == 0 {
+			// Check DB cache again (might have been populated by another goroutine)
+			cached, err := s.gameCacheRepo.GetByAppID(game.AppID)
+			if err == nil && cached != nil && !cached.IsStale(gameCacheMaxAge) {
+				game.Categories = cached.GetCategories()
+				if cached.Name != "" {
+					game.Name = cached.Name
+				}
+			} else {
+				gamesToFetch = append(gamesToFetch, game)
+			}
+		}
 	}
-	sort.Slice(gamesToCheck, func(i, j int) bool {
-		return gamesToCheck[i].OwnerCount > gamesToCheck[j].OwnerCount
+
+	// Sort by owner count to prioritize popular games
+	sort.Slice(gamesToFetch, func(i, j int) bool {
+		return gamesToFetch[i].OwnerCount > gamesToFetch[j].OwnerCount
 	})
 
-	// Fetch store details for games (with rate limiting)
-	s.fetchGameCategories(gamesToCheck)
+	// Fetch categories from Steam Store API (with rate limiting and DB caching)
+	s.fetchGameCategories(gamesToFetch)
 
 	// Filter for multiplayer games and build response
 	var allGames []models.Game
@@ -306,67 +364,79 @@ type storeAppDetailsResponse map[string]struct {
 	} `json:"data"`
 }
 
-// fetchGameCategories fetches categories for multiple games
+// fetchGameCategories fetches categories for multiple games from Steam Store API
+// Uses DB caching and respects rate limits
 func (s *GameService) fetchGameCategories(games []*models.Game) {
-	// Rate limit: Steam Store API allows ~200 requests per 5 minutes
-	// We'll process in batches with delays
-	const batchSize = 10
-	const delayBetweenBatches = 500 * time.Millisecond
+	if len(games) == 0 {
+		return
+	}
 
-	for i := 0; i < len(games); i += batchSize {
-		end := i + batchSize
-		if end > len(games) {
-			end = len(games)
+	// Check if we're rate limited
+	if s.isRateLimited() {
+		log.Printf("Skipping Steam Store API calls - rate limited until %v", s.rateLimiter.pausedUntil)
+		return
+	}
+
+	// Process sequentially with delays to avoid rate limits
+	const delayBetweenRequests = 300 * time.Millisecond
+
+	for _, game := range games {
+		// Check rate limit before each request
+		if s.isRateLimited() {
+			log.Printf("Rate limit hit - stopping category fetches")
+			return
 		}
 
-		batch := games[i:end]
-		var wg sync.WaitGroup
-
-		for _, game := range batch {
-			wg.Add(1)
-			go func(g *models.Game) {
-				defer wg.Done()
-				categories, err := s.fetchGameCategoriesFromStore(g.AppID)
-				if err != nil {
-					// Log but don't fail - some games may not have store pages
-					log.Printf("Could not fetch categories for %s (%d): %v", g.Name, g.AppID, err)
-					return
-				}
-				g.Categories = categories
-			}(game)
+		name, categories, err := s.fetchGameCategoriesFromStore(game.AppID)
+		if err != nil {
+			log.Printf("Could not fetch categories for %s (%d): %v", game.Name, game.AppID, err)
+			continue
 		}
 
-		wg.Wait()
-
-		if end < len(games) {
-			time.Sleep(delayBetweenBatches)
+		game.Categories = categories
+		if name != "" {
+			game.Name = name
 		}
+
+		// Save to DB cache
+		if err := s.gameCacheRepo.Upsert(game.AppID, game.Name, categories); err != nil {
+			log.Printf("Failed to cache game %d: %v", game.AppID, err)
+		}
+
+		time.Sleep(delayBetweenRequests)
 	}
 }
 
 // fetchGameCategoriesFromStore fetches categories for a single game from Steam Store
-func (s *GameService) fetchGameCategoriesFromStore(appID int) ([]string, error) {
+// Returns name, categories, and error. Handles 429 rate limiting.
+func (s *GameService) fetchGameCategoriesFromStore(appID int) (string, []string, error) {
 	url := fmt.Sprintf("%s/appdetails?appids=%d", steamStoreBaseURL, appID)
 
 	resp, err := s.httpClient.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call Steam Store API: %w", err)
+		return "", nil, fmt.Errorf("failed to call Steam Store API: %w", err)
 	}
 	defer resp.Body.Close()
 
+	// Handle rate limiting
+	if resp.StatusCode == http.StatusTooManyRequests {
+		s.setRateLimited()
+		return "", nil, fmt.Errorf("rate limited (429)")
+	}
+
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Steam Store API returned status %d", resp.StatusCode)
+		return "", nil, fmt.Errorf("Steam Store API returned status %d", resp.StatusCode)
 	}
 
 	var apiResp storeAppDetailsResponse
 	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
-		return nil, fmt.Errorf("failed to parse Steam Store API response: %w", err)
+		return "", nil, fmt.Errorf("failed to parse Steam Store API response: %w", err)
 	}
 
 	appIDStr := fmt.Sprintf("%d", appID)
 	appData, ok := apiResp[appIDStr]
 	if !ok || !appData.Success {
-		return nil, fmt.Errorf("game not found or not accessible")
+		return "", nil, fmt.Errorf("game not found or not accessible")
 	}
 
 	var categories []string
@@ -374,64 +444,66 @@ func (s *GameService) fetchGameCategoriesFromStore(appID int) ([]string, error) 
 		categories = append(categories, cat.Description)
 	}
 
-	return categories, nil
+	return appData.Data.Name, categories, nil
 }
 
 // fetchGameDetails fetches full details for a single game (used for pinned games not in library)
+// First checks DB cache, then fetches from Steam Store API if needed
 func (s *GameService) fetchGameDetails(appID int) (*models.Game, error) {
-	url := fmt.Sprintf("%s/appdetails?appids=%d", steamStoreBaseURL, appID)
+	// Cache image asynchronously
+	s.imageCacheService.CacheImageAsync(appID)
 
-	resp, err := s.httpClient.Get(url)
+	// First try DB cache
+	cached, err := s.gameCacheRepo.GetByAppID(appID)
+	if err == nil && cached != nil && !cached.IsStale(gameCacheMaxAge) {
+		return &models.Game{
+			AppID:           appID,
+			Name:            cached.Name,
+			HeaderImageURL:  s.imageCacheService.GetLocalImageURL(appID),
+			CapsuleImageURL: fmt.Sprintf("%s/%d/capsule_231x87.jpg", steamCDNBaseURL, appID),
+			Categories:      cached.GetCategories(),
+			OwnerCount:      0,
+			Owners:          []string{},
+		}, nil
+	}
+
+	// Check rate limit
+	if s.isRateLimited() {
+		// Return partial data from stale cache if available
+		if cached != nil {
+			return &models.Game{
+				AppID:           appID,
+				Name:            cached.Name,
+				HeaderImageURL:  s.imageCacheService.GetLocalImageURL(appID),
+				CapsuleImageURL: fmt.Sprintf("%s/%d/capsule_231x87.jpg", steamCDNBaseURL, appID),
+				Categories:      cached.GetCategories(),
+				OwnerCount:      0,
+				Owners:          []string{},
+			}, nil
+		}
+		return nil, fmt.Errorf("rate limited and no cache available")
+	}
+
+	// Fetch from Steam Store API
+	name, categories, err := s.fetchGameCategoriesFromStore(appID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call Steam Store API: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Steam Store API returned status %d", resp.StatusCode)
+		return nil, err
 	}
 
-	var apiResp map[string]struct {
-		Success bool `json:"success"`
-		Data    struct {
-			Name       string `json:"name"`
-			Categories []struct {
-				ID          int    `json:"id"`
-				Description string `json:"description"`
-			} `json:"categories"`
-		} `json:"data"`
+	// Save to DB cache
+	if err := s.gameCacheRepo.Upsert(appID, name, categories); err != nil {
+		log.Printf("Failed to cache game %d: %v", appID, err)
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
-		return nil, fmt.Errorf("failed to parse Steam Store API response: %w", err)
-	}
-
-	appIDStr := fmt.Sprintf("%d", appID)
-	appData, ok := apiResp[appIDStr]
-	if !ok || !appData.Success {
-		return nil, fmt.Errorf("game not found or not accessible")
-	}
-
-	var categories []string
-	for _, cat := range appData.Data.Categories {
-		categories = append(categories, cat.Description)
-	}
-
-	// Check if game qualifies as multiplayer
-	game := &models.Game{
+	return &models.Game{
 		AppID:           appID,
-		Name:            appData.Data.Name,
-		HeaderImageURL:  fmt.Sprintf("%s/%d/header.jpg", steamCDNBaseURL, appID),
+		Name:            name,
+		HeaderImageURL:  s.imageCacheService.GetLocalImageURL(appID),
 		CapsuleImageURL: fmt.Sprintf("%s/%d/capsule_231x87.jpg", steamCDNBaseURL, appID),
 		Categories:      categories,
 		OwnerCount:      0,
 		Owners:          []string{},
-	}
-
-	// For pinned games, we include them even if not strictly multiplayer
-	// (admin knows best what games to pin)
-
-	return game, nil
+	}, nil
 }
 
 // GetPinnedGameIDs returns the list of pinned game IDs
