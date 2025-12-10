@@ -16,24 +16,26 @@ func NewChatRepository() *ChatRepository {
 	return &ChatRepository{}
 }
 
-// Create creates a new chat message with the user's current achievements
+// Create creates a new chat message with the user's current achievements (with retry for SQLITE_BUSY)
 func (r *ChatRepository) Create(msg *models.ChatMessage) error {
-	result, err := database.DB.Exec(`
-		INSERT INTO chat_messages (user_id, message, achievements)
-		VALUES (?, ?, ?)`,
-		msg.UserID, msg.Message, msg.Achievements,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create chat message: %w", err)
-	}
+	return database.WithRetry(func() error {
+		result, err := database.DB.Exec(`
+			INSERT INTO chat_messages (user_id, message, achievements)
+			VALUES (?, ?, ?)`,
+			msg.UserID, msg.Message, msg.Achievements,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create chat message: %w", err)
+		}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get last insert id: %w", err)
-	}
+		id, err := result.LastInsertId()
+		if err != nil {
+			return fmt.Errorf("failed to get last insert id: %w", err)
+		}
 
-	msg.ID = uint64(id)
-	return nil
+		msg.ID = uint64(id)
+		return nil
+	})
 }
 
 // GetRecent returns the most recent chat messages

@@ -16,24 +16,26 @@ func NewVoteRepository() *VoteRepository {
 	return &VoteRepository{}
 }
 
-// Create creates a new vote
+// Create creates a new vote (with retry for SQLITE_BUSY)
 func (r *VoteRepository) Create(vote *models.Vote) error {
-	result, err := database.DB.Exec(`
-		INSERT INTO votes (from_user_id, to_user_id, achievement_id, points)
-		VALUES (?, ?, ?, ?)`,
-		vote.FromUserID, vote.ToUserID, vote.AchievementID, vote.Points,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create vote: %w", err)
-	}
+	return database.WithRetry(func() error {
+		result, err := database.DB.Exec(`
+			INSERT INTO votes (from_user_id, to_user_id, achievement_id, points)
+			VALUES (?, ?, ?, ?)`,
+			vote.FromUserID, vote.ToUserID, vote.AchievementID, vote.Points,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create vote: %w", err)
+		}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get last insert id: %w", err)
-	}
+		id, err := result.LastInsertId()
+		if err != nil {
+			return fmt.Errorf("failed to get last insert id: %w", err)
+		}
 
-	vote.ID = uint64(id)
-	return nil
+		vote.ID = uint64(id)
+		return nil
+	})
 }
 
 // GetRecent returns the most recent votes for the timeline

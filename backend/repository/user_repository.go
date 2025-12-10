@@ -17,24 +17,26 @@ func NewUserRepository() *UserRepository {
 	return &UserRepository{}
 }
 
-// Create creates a new user in the database
+// Create creates a new user in the database (with retry for SQLITE_BUSY)
 func (r *UserRepository) Create(user *models.User) error {
-	result, err := database.DB.Exec(`
-		INSERT INTO users (steam_id, username, avatar_url, avatar_small, profile_url, credits, last_credit_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		user.SteamID, user.Username, user.AvatarURL, user.AvatarSmall, user.ProfileURL, user.Credits, user.LastCreditAt,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create user: %w", err)
-	}
+	return database.WithRetry(func() error {
+		result, err := database.DB.Exec(`
+			INSERT INTO users (steam_id, username, avatar_url, avatar_small, profile_url, credits, last_credit_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			user.SteamID, user.Username, user.AvatarURL, user.AvatarSmall, user.ProfileURL, user.Credits, user.LastCreditAt,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create user: %w", err)
+		}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return fmt.Errorf("failed to get last insert id: %w", err)
-	}
+		id, err := result.LastInsertId()
+		if err != nil {
+			return fmt.Errorf("failed to get last insert id: %w", err)
+		}
 
-	user.ID = uint64(id)
-	return nil
+		user.ID = uint64(id)
+		return nil
+	})
 }
 
 // GetByID finds a user by ID
@@ -99,32 +101,36 @@ func (r *UserRepository) GetAll() ([]models.User, error) {
 	return users, nil
 }
 
-// Update updates a user's profile information
+// Update updates a user's profile information (with retry for SQLITE_BUSY)
 func (r *UserRepository) Update(user *models.User) error {
-	_, err := database.DB.Exec(`
-		UPDATE users
-		SET username = ?, avatar_url = ?, avatar_small = ?, profile_url = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?`,
-		user.Username, user.AvatarURL, user.AvatarSmall, user.ProfileURL, user.ID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update user: %w", err)
-	}
-	return nil
+	return database.WithRetry(func() error {
+		_, err := database.DB.Exec(`
+			UPDATE users
+			SET username = ?, avatar_url = ?, avatar_small = ?, profile_url = ?, updated_at = CURRENT_TIMESTAMP
+			WHERE id = ?`,
+			user.Username, user.AvatarURL, user.AvatarSmall, user.ProfileURL, user.ID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to update user: %w", err)
+		}
+		return nil
+	})
 }
 
-// UpdateCredits updates a user's credits
+// UpdateCredits updates a user's credits (with retry for SQLITE_BUSY)
 func (r *UserRepository) UpdateCredits(userID uint64, credits int, lastCreditAt time.Time) error {
-	_, err := database.DB.Exec(`
-		UPDATE users
-		SET credits = ?, last_credit_at = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?`,
-		credits, lastCreditAt, userID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update credits: %w", err)
-	}
-	return nil
+	return database.WithRetry(func() error {
+		_, err := database.DB.Exec(`
+			UPDATE users
+			SET credits = ?, last_credit_at = ?, updated_at = CURRENT_TIMESTAMP
+			WHERE id = ?`,
+			credits, lastCreditAt, userID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to update credits: %w", err)
+		}
+		return nil
+	})
 }
 
 // DeductCredit deducts one credit from a user (atomic operation)
@@ -132,21 +138,30 @@ func (r *UserRepository) DeductCredit(userID uint64) error {
 	return r.DeductCredits(userID, 1)
 }
 
-// DeductCredits deducts a specified amount of credits from a user (atomic operation)
+// DeductCredits deducts a specified amount of credits from a user (atomic operation with retry)
 func (r *UserRepository) DeductCredits(userID uint64, amount int) error {
-	result, err := database.DB.Exec(`
-		UPDATE users
-		SET credits = credits - ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ? AND credits >= ?`,
-		amount, userID, amount,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to deduct credits: %w", err)
-	}
+	var rowsAffected int64
 
-	rowsAffected, err := result.RowsAffected()
+	err := database.WithRetry(func() error {
+		result, err := database.DB.Exec(`
+			UPDATE users
+			SET credits = credits - ?, updated_at = CURRENT_TIMESTAMP
+			WHERE id = ? AND credits >= ?`,
+			amount, userID, amount,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to deduct credits: %w", err)
+		}
+
+		rowsAffected, err = result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("failed to check rows affected: %w", err)
+		}
+		return nil
+	})
+
 	if err != nil {
-		return fmt.Errorf("failed to check rows affected: %w", err)
+		return err
 	}
 
 	if rowsAffected == 0 {
@@ -156,40 +171,50 @@ func (r *UserRepository) DeductCredits(userID uint64, amount int) error {
 	return nil
 }
 
-// ResetAllCredits sets all users' credits to 0 and resets the time until next credit
+// ResetAllCredits sets all users' credits to 0 and resets the time until next credit (with retry for SQLITE_BUSY)
 func (r *UserRepository) ResetAllCredits() (int64, error) {
-	result, err := database.DB.Exec(`
-		UPDATE users
-		SET credits = 0, last_credit_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP`)
-	if err != nil {
-		return 0, fmt.Errorf("failed to reset all credits: %w", err)
-	}
+	var rowsAffected int64
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get rows affected: %w", err)
-	}
+	err := database.WithRetry(func() error {
+		result, err := database.DB.Exec(`
+			UPDATE users
+			SET credits = 0, last_credit_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP`)
+		if err != nil {
+			return fmt.Errorf("failed to reset all credits: %w", err)
+		}
 
-	return rowsAffected, nil
+		rowsAffected, err = result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("failed to get rows affected: %w", err)
+		}
+		return nil
+	})
+
+	return rowsAffected, err
 }
 
-// GiveEveryoneCredit gives each user 1 credit (respecting max credits)
+// GiveEveryoneCredit gives each user 1 credit (respecting max credits, with retry for SQLITE_BUSY)
 func (r *UserRepository) GiveEveryoneCredit(maxCredits int) (int64, error) {
-	result, err := database.DB.Exec(`
-		UPDATE users
-		SET credits = MIN(credits + 1, ?), updated_at = CURRENT_TIMESTAMP
-		WHERE credits < ?`,
-		maxCredits, maxCredits)
-	if err != nil {
-		return 0, fmt.Errorf("failed to give everyone credit: %w", err)
-	}
+	var rowsAffected int64
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get rows affected: %w", err)
-	}
+	err := database.WithRetry(func() error {
+		result, err := database.DB.Exec(`
+			UPDATE users
+			SET credits = MIN(credits + 1, ?), updated_at = CURRENT_TIMESTAMP
+			WHERE credits < ?`,
+			maxCredits, maxCredits)
+		if err != nil {
+			return fmt.Errorf("failed to give everyone credit: %w", err)
+		}
 
-	return rowsAffected, nil
+		rowsAffected, err = result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("failed to get rows affected: %w", err)
+		}
+		return nil
+	})
+
+	return rowsAffected, err
 }
 
 // ShiftAllLastCreditAt shifts all users' last_credit_at forward by the given duration

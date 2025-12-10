@@ -1,11 +1,15 @@
 package database
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -69,6 +73,95 @@ func Close() error {
 		return DB.Close()
 	}
 	return nil
+}
+
+// ErrBusy is returned when SQLite is busy after all retries
+var ErrBusy = errors.New("database is busy, please try again")
+
+// isBusyError checks if an error is a SQLite BUSY error
+func isBusyError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := strings.ToLower(err.Error())
+	return strings.Contains(errStr, "busy") || strings.Contains(errStr, "locked")
+}
+
+// WithRetry executes a function with retry logic for SQLITE_BUSY errors
+// It will retry up to maxRetries times with exponential backoff
+func WithRetry(fn func() error) error {
+	return WithRetryContext(context.Background(), fn)
+}
+
+// WithRetryContext executes a function with retry logic and context support
+func WithRetryContext(ctx context.Context, fn func() error) error {
+	const maxRetries = 5
+	baseDelay := 50 * time.Millisecond
+
+	var lastErr error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		// Check context before each attempt
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
+		lastErr = fn()
+		if lastErr == nil {
+			return nil
+		}
+
+		// Only retry on SQLITE_BUSY errors
+		if !isBusyError(lastErr) {
+			return lastErr
+		}
+
+		// Log retry attempt
+		if attempt > 0 {
+			log.Printf("SQLite busy, retry attempt %d/%d", attempt+1, maxRetries)
+		}
+
+		// Exponential backoff: 50ms, 100ms, 200ms, 400ms, 800ms
+		delay := baseDelay * time.Duration(1<<attempt)
+		select {
+		case <-time.After(delay):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	log.Printf("SQLite busy after %d retries: %v", maxRetries, lastErr)
+	return ErrBusy
+}
+
+// Transaction represents a database transaction with retry support
+type Transaction struct {
+	tx *sql.Tx
+}
+
+// WithTransaction executes a function within a transaction with retry support
+// If the function returns an error, the transaction is rolled back
+// If the function succeeds, the transaction is committed
+func WithTransaction(fn func(tx *sql.Tx) error) error {
+	return WithRetry(func() error {
+		tx, err := DB.Begin()
+		if err != nil {
+			return fmt.Errorf("failed to begin transaction: %w", err)
+		}
+
+		// Execute the function
+		if err := fn(tx); err != nil {
+			// Attempt rollback, ignore rollback errors
+			_ = tx.Rollback()
+			return err
+		}
+
+		// Commit the transaction
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("failed to commit transaction: %w", err)
+		}
+
+		return nil
+	})
 }
 
 // runMigrations creates all required tables
