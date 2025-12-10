@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, ViewChild, ElementRef, AfterViewChecked, effect } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, ViewChild, ElementRef, AfterViewChecked, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ChatService } from '../../services/chat.service';
@@ -77,6 +77,7 @@ import { ChatMessage, AchievementBadge } from '../../models/chat.model';
 
         <form class="chat-input" (ngSubmit)="sendMessage()">
           <input
+            #messageInput
             type="text"
             [(ngModel)]="newMessage"
             name="message"
@@ -388,12 +389,13 @@ import { ChatMessage, AchievementBadge } from '../../models/chat.model';
     }
   `]
 })
-export class ChatComponent implements OnInit, AfterViewChecked {
+export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   private chatService = inject(ChatService);
   private authService = inject(AuthService);
   private achievementService = inject(AchievementService);
 
   @ViewChild('messagesContainer') private messagesContainer!: ElementRef;
+  @ViewChild('messageInput') private messageInput!: ElementRef<HTMLInputElement>;
 
   messages = this.chatService.chatMessages;
   loading = signal(true);
@@ -413,7 +415,12 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   }
 
   ngOnInit(): void {
+    this.chatService.setChatOpen(true);
     this.loadMessages();
+  }
+
+  ngOnDestroy(): void {
+    this.chatService.setChatOpen(false);
   }
 
   ngAfterViewChecked(): void {
@@ -447,10 +454,14 @@ export class ChatComponent implements OnInit, AfterViewChecked {
         this.newMessage = '';
         this.sending.set(false);
         this.shouldScrollToBottom = true;
+        // Keep focus on input field
+        setTimeout(() => this.messageInput?.nativeElement?.focus(), 0);
       },
       error: (err) => {
         console.error('Failed to send message', err);
         this.sending.set(false);
+        // Keep focus on input field even on error
+        setTimeout(() => this.messageInput?.nativeElement?.focus(), 0);
       }
     });
   }

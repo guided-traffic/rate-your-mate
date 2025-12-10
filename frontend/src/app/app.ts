@@ -8,6 +8,7 @@ import { AuthService } from './services/auth.service';
 import { WebSocketService } from './services/websocket.service';
 import { ConnectionStatusService } from './services/connection-status.service';
 import { AchievementService } from './services/achievement.service';
+import { ChatService } from './services/chat.service';
 
 @Component({
   selector: 'app-root',
@@ -21,6 +22,7 @@ export class App implements OnInit, OnDestroy {
   private wsService = inject(WebSocketService);
   private connectionStatus = inject(ConnectionStatusService);
   private achievementService = inject(AchievementService);
+  chatService = inject(ChatService);
 
   get isAuthenticated(): boolean {
     return this.authService.isAuthenticated();

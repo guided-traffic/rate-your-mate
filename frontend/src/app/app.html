@@ -13,5 +13,8 @@
 @if (isAuthenticated) {
   <a routerLink="/chat" class="chat-fab" title="Chat">
     <span class="chat-fab-icon">💬</span>
+    @if (chatService.unreadCount() > 0) {
+      <span class="chat-fab-badge">{{ chatService.unreadCount() > 99 ? '99+' : chatService.unreadCount() }}</span>
+    }
   </a>
 }

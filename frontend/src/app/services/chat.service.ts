@@ -1,10 +1,11 @@
-import { Injectable, signal, inject } from '@angular/core';
+import { Injectable, signal, inject, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { ChatMessage, ChatMessagesResponse, CreateChatMessageRequest } from '../models/chat.model';
 import { ChatMessagePayload } from '../models/websocket.model';
 import { WebSocketService } from './websocket.service';
+import { AuthService } from './auth.service';
 
 @Injectable({
   providedIn: 'root'
@@ -12,9 +13,15 @@ import { WebSocketService } from './websocket.service';
 export class ChatService {
   private http = inject(HttpClient);
   private wsService = inject(WebSocketService);
+  private authService = inject(AuthService);
 
   private messages = signal<ChatMessage[]>([]);
   readonly chatMessages = this.messages.asReadonly();
+
+  private _unreadCount = signal<number>(0);
+  readonly unreadCount = this._unreadCount.asReadonly();
+
+  private _isChatOpen = signal<boolean>(false);
 
   constructor() {
     // Subscribe to WebSocket chat messages
@@ -58,9 +65,26 @@ export class ChatService {
 
     // Add to messages array
     this.messages.update(msgs => [...msgs, newMessage]);
+
+    // Increment unread count if chat is not open and message is not from current user
+    const currentUser = this.authService.user();
+    if (!this._isChatOpen() && currentUser && payload.user_id !== currentUser.id) {
+      this._unreadCount.update(count => count + 1);
+    }
   }
 
   clearMessages(): void {
     this.messages.set([]);
+  }
+
+  markAsRead(): void {
+    this._unreadCount.set(0);
+  }
+
+  setChatOpen(isOpen: boolean): void {
+    this._isChatOpen.set(isOpen);
+    if (isOpen) {
+      this.markAsRead();
+    }
   }
 }
