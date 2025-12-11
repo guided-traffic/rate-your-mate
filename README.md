@@ -14,30 +14,31 @@ Eine Webanwendung für LAN-Partys, bei der sich Spieler gegenseitig mit Achievem
 
 ## 📸 Screenshots
 
+### Games
+Übersicht der aktuellen Spiele auf der LAN-Party.
+
+![Games](docs/screenshots/games.png)
+
 ### Rate Player
 Bewerte deine Mitspieler mit positiven oder negativen Achievements.
 
 ![Rate Player](docs/screenshots/rate-player.png)
-
-### Timeline
-Verfolge alle Votes in Echtzeit – wer hat wen mit welchem Achievement bewertet?
-
-![Timeline](docs/screenshots/timeline.png)
 
 ### Leaderboard
 Sieh dir die Top 3 Spieler pro Achievement an.
 
 ![Leaderboard](docs/screenshots/leaderboard.png)
 
+### Timeline
+Verfolge alle Votes in Echtzeit – wer hat wen mit welchem Achievement bewertet?
+
+![Timeline](docs/screenshots/timeline.png)
+
 ### Chat
 Kommuniziere mit anderen Spielern während der LAN-Party.
 
 ![Chat](docs/screenshots/chat.png)
 
-### Games
-Übersicht der aktuellen Spiele auf der LAN-Party.
-
-![Games](docs/screenshots/games.png)
 
 ## 🚀 Installation
 
