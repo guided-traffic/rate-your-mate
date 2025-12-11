@@ -28,7 +28,7 @@ COPY . .
 # Build the application with cross-compilation support
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
     go build -a -installsuffix cgo \
-    -ldflags="-w -s -X main.version=${BUILD_NUMBER:-dev} -X main.commit=${GIT_COMMIT:-unknown} -X main.buildTime=${BUILD_TIME:-unknown}" \
+    -ldflags="-w -s -X main.Version=${BUILD_NUMBER:-dev} -X main.GitCommit=${GIT_COMMIT:-unknown} -X main.BuildTime=${BUILD_TIME:-unknown}" \
     -o main .
 
 # Final stage - using distroless for minimal attack surface

@@ -22,8 +22,20 @@
         </a>
       </span>
     </div>
-    <div class="footer-copyright">
-      © {{ currentYear }} <a href="https://github.com/guided-traffic/rate-your-mate" target="_blank" rel="noopener noreferrer" class="footer-link repo-link">rate-your-mate</a>
+    <div class="footer-bottom">
+      <div class="footer-copyright">
+        © {{ currentYear }} <a href="https://github.com/guided-traffic/rate-your-mate" target="_blank" rel="noopener noreferrer" class="footer-link repo-link">rate-your-mate</a>
+      </div>
+      <div class="footer-versions">
+        <span class="version-badge" title="Frontend Version">
+          <span class="version-label">Frontend</span>
+          <span class="version-value">{{ versionService.frontendVersion() }}</span>
+        </span>
+        <span class="version-badge" [title]="'Backend Version' + (versionService.backendGitCommit() ? ' (' + versionService.backendGitCommit() + ')' : '')">
+          <span class="version-label">Backend</span>
+          <span class="version-value" [class.offline]="versionService.backendVersion() === 'offline'">{{ versionService.backendVersion() }}</span>
+        </span>
+      </div>
     </div>
   </div>
 </footer>

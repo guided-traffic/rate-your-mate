@@ -16,6 +16,13 @@ import (
 	"github.com/guided-traffic/lan-party-manager/backend/websocket"
 )
 
+// Version information - set via ldflags during build
+var (
+	Version   = "dev"
+	BuildTime = "unknown"
+	GitCommit = "unknown"
+)
+
 // Global config
 var cfg *config.Config
 
@@ -95,10 +102,13 @@ func main() {
 	corsConfig.AllowCredentials = true
 	r.Use(cors.New(corsConfig))
 
-	// Health check endpoint
+	// Health check endpoint with version info
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"status": "healthy",
+			"status":    "healthy",
+			"version":   Version,
+			"buildTime": BuildTime,
+			"gitCommit": GitCommit,
 		})
 	})
 

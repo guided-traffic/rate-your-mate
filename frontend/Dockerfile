@@ -2,7 +2,7 @@
 FROM node:22-alpine AS builder
 
 # Accept build arguments
-ARG BUILD_NUMBER
+ARG BUILD_NUMBER=dev
 ARG GIT_COMMIT
 ARG BUILD_TIME
 
@@ -11,6 +11,9 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+
+# Replace version placeholder in environment file before build
+RUN sed -i "s/__VERSION__/${BUILD_NUMBER}/g" src/environments/environment.prod.ts
 
 RUN npm run build -- --configuration=production
 
