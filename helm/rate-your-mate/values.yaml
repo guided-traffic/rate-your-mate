@@ -36,7 +36,8 @@ backend:
     requests:
       cpu: 250m
       memory: 256Mi
-  # Persistent storage for SQLite database (only used when database.type=sqlite)
+  # Persistent storage for backend data (SQLite database and image cache)
+  # Required for SQLite, recommended for MySQL (for game image caching)
   persistence:
     enabled: false
     # Storage class - leave empty for default, set to "-" for no storage class

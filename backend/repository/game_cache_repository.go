@@ -126,22 +126,43 @@ func (r *GameCacheRepository) UpsertWithStatus(appID int, name string, categorie
 		price = &GamePriceInfo{ReviewScore: -1}
 	}
 
-	_, err = database.DB.Exec(`
-		INSERT INTO game_cache (app_id, name, categories, is_free, price_cents, original_cents, discount_percent, price_formatted, review_score, fetch_failed, fetched_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT(app_id) DO UPDATE SET
-			name = excluded.name,
-			categories = excluded.categories,
-			is_free = excluded.is_free,
-			price_cents = excluded.price_cents,
-			original_cents = excluded.original_cents,
-			discount_percent = excluded.discount_percent,
-			price_formatted = excluded.price_formatted,
-			review_score = excluded.review_score,
-			fetch_failed = excluded.fetch_failed,
-			fetched_at = CURRENT_TIMESTAMP`,
-		appID, name, string(categoriesJSON), price.IsFree, price.PriceCents, price.OriginalCents, price.DiscountPercent, price.PriceFormatted, price.ReviewScore, fetchFailed,
-	)
+	// Use database-specific upsert syntax
+	if database.IsSQLite() {
+		_, err = database.DB.Exec(`
+			INSERT INTO game_cache (app_id, name, categories, is_free, price_cents, original_cents, discount_percent, price_formatted, review_score, fetch_failed, fetched_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+			ON CONFLICT(app_id) DO UPDATE SET
+				name = excluded.name,
+				categories = excluded.categories,
+				is_free = excluded.is_free,
+				price_cents = excluded.price_cents,
+				original_cents = excluded.original_cents,
+				discount_percent = excluded.discount_percent,
+				price_formatted = excluded.price_formatted,
+				review_score = excluded.review_score,
+				fetch_failed = excluded.fetch_failed,
+				fetched_at = CURRENT_TIMESTAMP`,
+			appID, name, string(categoriesJSON), price.IsFree, price.PriceCents, price.OriginalCents, price.DiscountPercent, price.PriceFormatted, price.ReviewScore, fetchFailed,
+		)
+	} else {
+		// MySQL/MariaDB syntax
+		_, err = database.DB.Exec(`
+			INSERT INTO game_cache (app_id, name, categories, is_free, price_cents, original_cents, discount_percent, price_formatted, review_score, fetch_failed, fetched_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+			ON DUPLICATE KEY UPDATE
+				name = VALUES(name),
+				categories = VALUES(categories),
+				is_free = VALUES(is_free),
+				price_cents = VALUES(price_cents),
+				original_cents = VALUES(original_cents),
+				discount_percent = VALUES(discount_percent),
+				price_formatted = VALUES(price_formatted),
+				review_score = VALUES(review_score),
+				fetch_failed = VALUES(fetch_failed),
+				fetched_at = CURRENT_TIMESTAMP`,
+			appID, name, string(categoriesJSON), price.IsFree, price.PriceCents, price.OriginalCents, price.DiscountPercent, price.PriceFormatted, price.ReviewScore, fetchFailed,
+		)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to upsert game cache: %w", err)
 	}

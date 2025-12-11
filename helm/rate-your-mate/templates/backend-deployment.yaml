@@ -185,10 +185,10 @@ spec:
             periodSeconds: 5
           resources:
             {{- toYaml .Values.backend.resources | nindent 12 }}
-          {{- $needsVolumeMounts := or (and (eq .Values.database.type "sqlite") .Values.backend.persistence.enabled) (and (eq .Values.database.type "mysql") .Values.database.mysql.tls.enabled .Values.database.mysql.tls.caSecret.name) }}
+          {{- $needsVolumeMounts := or .Values.backend.persistence.enabled (and (eq .Values.database.type "mysql") .Values.database.mysql.tls.enabled .Values.database.mysql.tls.caSecret.name) }}
           {{- if $needsVolumeMounts }}
           volumeMounts:
-            {{- if and (eq .Values.database.type "sqlite") .Values.backend.persistence.enabled }}
+            {{- if .Values.backend.persistence.enabled }}
             - name: data
               mountPath: {{ .Values.backend.persistence.mountPath | default "/app/data" }}
             {{- end }}
@@ -198,10 +198,10 @@ spec:
               readOnly: true
             {{- end }}
           {{- end }}
-      {{- $needsVolumes := or (and (eq .Values.database.type "sqlite") .Values.backend.persistence.enabled) (and (eq .Values.database.type "mysql") .Values.database.mysql.tls.enabled .Values.database.mysql.tls.caSecret.name) }}
+      {{- $needsVolumes := or .Values.backend.persistence.enabled (and (eq .Values.database.type "mysql") .Values.database.mysql.tls.enabled .Values.database.mysql.tls.caSecret.name) }}
       {{- if $needsVolumes }}
       volumes:
-        {{- if and (eq .Values.database.type "sqlite") .Values.backend.persistence.enabled }}
+        {{- if .Values.backend.persistence.enabled }}
         - name: data
           persistentVolumeClaim:
             claimName: {{ include "rate-your-mate.fullname" . }}-backend-data
