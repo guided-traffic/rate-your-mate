@@ -46,6 +46,11 @@ func DefaultMySQLConfig() MySQLConfig {
 
 // initMySQL initializes a MySQL database connection
 func initMySQL(cfg MySQLConfig) error {
+	// First, try to create the database if it doesn't exist
+	if err := ensureMySQLDatabaseExists(cfg); err != nil {
+		return fmt.Errorf("failed to ensure database exists: %w", err)
+	}
+
 	// Build MySQL DSN
 	mysqlCfg := mysql.NewConfig()
 	mysqlCfg.User = cfg.User
@@ -99,6 +104,58 @@ func initMySQL(cfg MySQLConfig) error {
 	log.Printf("MySQL database initialized: %s@%s:%d/%s (TLS: %v)",
 		cfg.User, cfg.Host, cfg.Port, cfg.Database, cfg.TLSEnabled)
 
+	return nil
+}
+
+// ensureMySQLDatabaseExists connects without a database and creates it if necessary
+func ensureMySQLDatabaseExists(cfg MySQLConfig) error {
+	// Build MySQL DSN without database name
+	mysqlCfg := mysql.NewConfig()
+	mysqlCfg.User = cfg.User
+	mysqlCfg.Passwd = cfg.Password
+	mysqlCfg.Net = "tcp"
+	mysqlCfg.Addr = fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	mysqlCfg.ParseTime = true
+	mysqlCfg.Loc = time.UTC
+	mysqlCfg.MultiStatements = true
+
+	// Configure TLS if enabled
+	if cfg.TLSEnabled {
+		tlsConfig, err := buildTLSConfig(cfg)
+		if err != nil {
+			return fmt.Errorf("failed to configure TLS: %w", err)
+		}
+
+		tlsConfigName := "custom-init"
+		if err := mysql.RegisterTLSConfig(tlsConfigName, tlsConfig); err != nil {
+			// Ignore error if already registered
+			if err.Error() != "tls: failed to find any PEM data in certificate input" {
+				// Try to use existing config
+			}
+		}
+		mysqlCfg.TLSConfig = tlsConfigName
+	}
+
+	dsn := mysqlCfg.FormatDSN()
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return fmt.Errorf("failed to open MySQL connection: %w", err)
+	}
+	defer db.Close()
+
+	// Test the connection
+	if err := db.Ping(); err != nil {
+		return fmt.Errorf("failed to ping MySQL server: %w", err)
+	}
+
+	// Create database if it doesn't exist
+	createDBSQL := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", cfg.Database)
+	_, err = db.Exec(createDBSQL)
+	if err != nil {
+		return fmt.Errorf("failed to create database '%s': %w", cfg.Database, err)
+	}
+
+	log.Printf("Ensured MySQL database '%s' exists", cfg.Database)
 	return nil
 }
 

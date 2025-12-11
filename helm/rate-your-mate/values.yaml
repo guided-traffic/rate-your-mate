@@ -91,7 +91,7 @@ database:
     port: 3306
     user: ""
     password: ""
-    database: "rate_your_mate"
+    database: "rate-your-mate"
 
     # TLS configuration
     tls:
