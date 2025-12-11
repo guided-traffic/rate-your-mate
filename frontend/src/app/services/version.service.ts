@@ -24,8 +24,8 @@ export class VersionService {
   private readonly healthUrl: string;
 
   constructor(private http: HttpClient) {
-    // Health endpoint is at root level, not under /api/v1
-    this.healthUrl = environment.apiUrl.replace('/api/v1', '') + '/health';
+    // Health endpoint is under /api/v1 for proper ingress routing
+    this.healthUrl = environment.apiUrl + '/health';
     this.loadBackendVersion();
   }
 

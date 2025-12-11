@@ -90,8 +90,8 @@ export class ConnectionStatusService implements OnDestroy {
 
     this.isCheckingHealth = true;
 
-    // Use a simple health check endpoint
-    this.http.get(`${environment.apiUrl.replace('/api/v1', '')}/health`, { responseType: 'text' }).subscribe({
+    // Use the health check endpoint under /api/v1 for proper ingress routing
+    this.http.get(`${environment.apiUrl}/health`, { responseType: 'text' }).subscribe({
       next: () => {
         console.log('[ConnectionStatus] Backend is back online');
         this.isCheckingHealth = false;

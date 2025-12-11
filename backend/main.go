@@ -115,6 +115,16 @@ func main() {
 	// API routes
 	api := r.Group("/api/v1")
 	{
+		// Health check endpoint (also available at /health for backwards compatibility)
+		api.GET("/health", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{
+				"status":    "healthy",
+				"version":   Version,
+				"buildTime": BuildTime,
+				"gitCommit": GitCommit,
+			})
+		})
+
 		// Auth endpoints (public)
 		auth := api.Group("/auth")
 		{
