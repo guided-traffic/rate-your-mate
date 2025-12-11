@@ -99,10 +99,10 @@ export class AuthCallbackComponent implements OnInit {
     if (token) {
       this.auth.handleCallback(token);
 
-      // Navigate to timeline after successful login
+      // Navigate to games after successful login
       // WebSocket connection is handled by App component
       setTimeout(() => {
-        this.router.navigate(['/timeline']);
+        this.router.navigate(['/games']);
       }, 500);
     } else {
       this.error = 'Kein Token erhalten. Bitte versuche es erneut.';
