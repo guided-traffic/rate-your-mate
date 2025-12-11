@@ -31,8 +31,26 @@ func main() {
 	}
 	log.Println("Steam endpoints are reachable")
 
-	// Initialize database
-	if err := database.Init("data/lan-party.db"); err != nil {
+	// Initialize database based on configuration
+	dbCfg := database.Config{
+		Type:       database.DBType(cfg.DBType),
+		SQLitePath: cfg.DBPath,
+		MySQL: database.MySQLConfig{
+			Host:            cfg.MySQLHost,
+			Port:            cfg.MySQLPort,
+			User:            cfg.MySQLUser,
+			Password:        cfg.MySQLPassword,
+			Database:        cfg.MySQLDatabase,
+			TLSEnabled:      cfg.MySQLTLSEnabled,
+			TLSSkipVerify:   cfg.MySQLTLSSkipVerify,
+			TLSCACert:       cfg.MySQLTLSCACert,
+			MaxOpenConns:    cfg.MySQLMaxOpenConns,
+			MaxIdleConns:    cfg.MySQLMaxIdleConns,
+			ConnMaxLifetime: cfg.MySQLConnMaxLifetime,
+			ConnMaxIdleTime: cfg.MySQLConnMaxIdleTime,
+		},
+	}
+	if err := database.Init(dbCfg); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer database.Close()

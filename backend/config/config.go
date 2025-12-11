@@ -17,12 +17,30 @@ type Config struct {
 	FrontendURL string
 	BackendURL  string
 
+	// Database
+	DBType     string // "sqlite" or "mysql"
+	DBPath     string // SQLite database path
+
+	// MySQL
+	MySQLHost            string
+	MySQLPort            int
+	MySQLUser            string
+	MySQLPassword        string
+	MySQLDatabase        string
+	MySQLTLSEnabled      bool
+	MySQLTLSSkipVerify   bool
+	MySQLTLSCACert       string // Path to CA certificate
+	MySQLMaxOpenConns    int
+	MySQLMaxIdleConns    int
+	MySQLConnMaxLifetime time.Duration
+	MySQLConnMaxIdleTime time.Duration
+
 	// Steam
 	SteamAPIKey string
 
 	// JWT
-	JWTSecret          string
-	JWTExpirationDays  int
+	JWTSecret         string
+	JWTExpirationDays int
 
 	// Credits
 	CreditIntervalMinutes int
@@ -47,16 +65,41 @@ func Load() *Config {
 	}
 
 	cfg := &Config{
-		Port:                  getEnv("PORT", "8080"),
-		FrontendURL:          getEnv("FRONTEND_URL", "http://localhost:4200"),
-		BackendURL:           getEnv("BACKEND_URL", "http://localhost:8080"),
-		SteamAPIKey:          getEnv("STEAM_API_KEY", ""),
-		JWTSecret:            getEnv("JWT_SECRET", ""),
-		JWTExpirationDays:    getEnvAsInt("JWT_EXPIRATION_DAYS", 7),
+		// Server
+		Port:        getEnv("PORT", "8080"),
+		FrontendURL: getEnv("FRONTEND_URL", "http://localhost:4200"),
+		BackendURL:  getEnv("BACKEND_URL", "http://localhost:8080"),
+
+		// Database
+		DBType: getEnv("DB_TYPE", "sqlite"),
+		DBPath: getEnv("DB_PATH", "data/rate-your-mate.db"),
+
+		// MySQL
+		MySQLHost:            getEnv("MYSQL_HOST", "localhost"),
+		MySQLPort:            getEnvAsInt("MYSQL_PORT", 3306),
+		MySQLUser:            getEnv("MYSQL_USER", ""),
+		MySQLPassword:        getEnv("MYSQL_PASSWORD", ""),
+		MySQLDatabase:        getEnv("MYSQL_DATABASE", "rate_your_mate"),
+		MySQLTLSEnabled:      getEnvAsBool("MYSQL_TLS_ENABLED", false),
+		MySQLTLSSkipVerify:   getEnvAsBool("MYSQL_TLS_SKIP_VERIFY", false),
+		MySQLTLSCACert:       getEnv("MYSQL_TLS_CA_CERT", ""),
+		MySQLMaxOpenConns:    getEnvAsInt("MYSQL_MAX_OPEN_CONNS", 25),
+		MySQLMaxIdleConns:    getEnvAsInt("MYSQL_MAX_IDLE_CONNS", 5),
+		MySQLConnMaxLifetime: getEnvAsDuration("MYSQL_CONN_MAX_LIFETIME", 5*time.Minute),
+		MySQLConnMaxIdleTime: getEnvAsDuration("MYSQL_CONN_MAX_IDLE_TIME", 1*time.Minute),
+
+		// Steam & Auth
+		SteamAPIKey:       getEnv("STEAM_API_KEY", ""),
+		JWTSecret:         getEnv("JWT_SECRET", ""),
+		JWTExpirationDays: getEnvAsInt("JWT_EXPIRATION_DAYS", 7),
+
+		// Credits
 		CreditIntervalMinutes: getEnvAsInt("CREDIT_INTERVAL_MINUTES", 10),
-		CreditMax:            getEnvAsInt("CREDIT_MAX", 10),
-		AdminSteamIDs:        getEnvAsStringSlice("ADMIN_STEAM_IDS", []string{}),
-		PinnedGameIDs:        getEnvAsIntSlice("PINNED_GAME_IDS", []int{}),
+		CreditMax:             getEnvAsInt("CREDIT_MAX", 10),
+
+		// Admin
+		AdminSteamIDs: getEnvAsStringSlice("ADMIN_STEAM_IDS", []string{}),
+		PinnedGameIDs: getEnvAsIntSlice("PINNED_GAME_IDS", []int{}),
 	}
 
 	// Validate required configuration
@@ -88,6 +131,27 @@ func getEnvAsInt(key string, defaultValue int) int {
 	if value, exists := os.LookupEnv(key); exists {
 		if intValue, err := strconv.Atoi(value); err == nil {
 			return intValue
+		}
+	}
+	return defaultValue
+}
+
+// getEnvAsBool reads an environment variable as boolean or returns a default value
+func getEnvAsBool(key string, defaultValue bool) bool {
+	if value, exists := os.LookupEnv(key); exists {
+		if boolValue, err := strconv.ParseBool(value); err == nil {
+			return boolValue
+		}
+	}
+	return defaultValue
+}
+
+// getEnvAsDuration reads an environment variable as duration or returns a default value
+// Supports formats like "5m", "1h", "30s"
+func getEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
+	if value, exists := os.LookupEnv(key); exists {
+		if duration, err := time.ParseDuration(value); err == nil {
+			return duration
 		}
 	}
 	return defaultValue

@@ -6,10 +6,19 @@ metadata:
     {{- include "rate-your-mate.backendLabels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  {{- if eq .Values.database.type "sqlite" }}
   # SQLite requires exclusive access - use Recreate strategy to avoid SQLITE_BUSY errors
   # during deployments (only one pod can access the database at a time)
   strategy:
     type: Recreate
+  {{- else }}
+  # MySQL supports multiple replicas with RollingUpdate strategy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  {{- end }}
   selector:
     matchLabels:
       {{- include "rate-your-mate.backendSelectorLabels" . | nindent 6 }}
@@ -85,6 +94,71 @@ spec:
                   name: {{ .Values.secrets.existingSecret | default (printf "%s-secrets" (include "rate-your-mate.fullname" .)) }}
                   key: JWT_SECRET
             {{- end }}
+            # Database configuration
+            - name: DB_TYPE
+              value: "{{ .Values.database.type }}"
+            {{- if eq .Values.database.type "sqlite" }}
+            - name: DB_PATH
+              value: "{{ .Values.database.sqlite.path }}"
+            {{- else if eq .Values.database.type "mysql" }}
+            # MySQL configuration
+            {{- if .Values.database.mysql.existingSecret.name }}
+            - name: MYSQL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.mysql.existingSecret.name }}
+                  key: {{ .Values.database.mysql.existingSecret.keys.host }}
+            - name: MYSQL_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.mysql.existingSecret.name }}
+                  key: {{ .Values.database.mysql.existingSecret.keys.port }}
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.mysql.existingSecret.name }}
+                  key: {{ .Values.database.mysql.existingSecret.keys.user }}
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.mysql.existingSecret.name }}
+                  key: {{ .Values.database.mysql.existingSecret.keys.password }}
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.mysql.existingSecret.name }}
+                  key: {{ .Values.database.mysql.existingSecret.keys.database }}
+            {{- else }}
+            - name: MYSQL_HOST
+              value: "{{ .Values.database.mysql.host }}"
+            - name: MYSQL_PORT
+              value: "{{ .Values.database.mysql.port }}"
+            - name: MYSQL_USER
+              value: "{{ .Values.database.mysql.user }}"
+            - name: MYSQL_PASSWORD
+              value: "{{ .Values.database.mysql.password }}"
+            - name: MYSQL_DATABASE
+              value: "{{ .Values.database.mysql.database }}"
+            {{- end }}
+            # MySQL TLS configuration
+            - name: MYSQL_TLS_ENABLED
+              value: "{{ .Values.database.mysql.tls.enabled }}"
+            - name: MYSQL_TLS_SKIP_VERIFY
+              value: "{{ .Values.database.mysql.tls.skipVerify }}"
+            {{- if and .Values.database.mysql.tls.enabled .Values.database.mysql.tls.caSecret.name }}
+            - name: MYSQL_TLS_CA_CERT
+              value: "/etc/mysql-tls/{{ .Values.database.mysql.tls.caSecret.key }}"
+            {{- end }}
+            # MySQL connection pool configuration
+            - name: MYSQL_MAX_OPEN_CONNS
+              value: "{{ .Values.database.mysql.pool.maxOpenConns }}"
+            - name: MYSQL_MAX_IDLE_CONNS
+              value: "{{ .Values.database.mysql.pool.maxIdleConns }}"
+            - name: MYSQL_CONN_MAX_LIFETIME
+              value: "{{ .Values.database.mysql.pool.connMaxLifetime }}"
+            - name: MYSQL_CONN_MAX_IDLE_TIME
+              value: "{{ .Values.database.mysql.pool.connMaxIdleTime }}"
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /health
@@ -99,16 +173,32 @@ spec:
             periodSeconds: 5
           resources:
             {{- toYaml .Values.backend.resources | nindent 12 }}
-          {{- if .Values.backend.persistence.enabled }}
+          {{- $needsVolumeMounts := or (and (eq .Values.database.type "sqlite") .Values.backend.persistence.enabled) (and (eq .Values.database.type "mysql") .Values.database.mysql.tls.enabled .Values.database.mysql.tls.caSecret.name) }}
+          {{- if $needsVolumeMounts }}
           volumeMounts:
+            {{- if and (eq .Values.database.type "sqlite") .Values.backend.persistence.enabled }}
             - name: data
               mountPath: {{ .Values.backend.persistence.mountPath | default "/app/data" }}
+            {{- end }}
+            {{- if and (eq .Values.database.type "mysql") .Values.database.mysql.tls.enabled .Values.database.mysql.tls.caSecret.name }}
+            - name: mysql-tls
+              mountPath: /etc/mysql-tls
+              readOnly: true
+            {{- end }}
           {{- end }}
-      {{- if .Values.backend.persistence.enabled }}
+      {{- $needsVolumes := or (and (eq .Values.database.type "sqlite") .Values.backend.persistence.enabled) (and (eq .Values.database.type "mysql") .Values.database.mysql.tls.enabled .Values.database.mysql.tls.caSecret.name) }}
+      {{- if $needsVolumes }}
       volumes:
+        {{- if and (eq .Values.database.type "sqlite") .Values.backend.persistence.enabled }}
         - name: data
           persistentVolumeClaim:
             claimName: {{ include "rate-your-mate.fullname" . }}-backend-data
+        {{- end }}
+        {{- if and (eq .Values.database.type "mysql") .Values.database.mysql.tls.enabled .Values.database.mysql.tls.caSecret.name }}
+        - name: mysql-tls
+          secret:
+            secretName: {{ .Values.database.mysql.tls.caSecret.name }}
+        {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

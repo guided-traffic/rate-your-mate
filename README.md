@@ -1,4 +1,4 @@
-# rate-your-mate
+# Rate your Mate
 
 Eine Webanwendung für LAN-Partys, bei der sich Spieler gegenseitig mit Achievements bewerten können.
 
@@ -44,6 +44,111 @@ helm install rate-your-mate rate-your-mate/rate-your-mate -f values.yaml
 | `ingress.hosts` | Ingress Hosts Konfiguration | `[]` |
 
 Alle verfügbaren Optionen findest du in der [values.yaml](helm/rate-your-mate/values.yaml).
+
+## 🗄️ Datenbank-Konfiguration
+
+Rate your Mate unterstützt zwei Datenbank-Backends:
+
+### SQLite (Standard)
+
+SQLite ist der Standard und ideal für kleine Events. Die Daten werden in einer lokalen Datei gespeichert.
+
+```yaml
+database:
+  type: sqlite
+  sqlite:
+    path: /app/data/rate-your-mate.db
+
+backend:
+  persistence:
+    enabled: true
+    size: 1Gi
+```
+
+### MySQL
+
+Für größere Events oder produktive Umgebungen kann MySQL verwendet werden.
+
+```yaml
+database:
+  type: mysql
+  mysql:
+    host: mysql.example.com
+    port: 3306
+    user: rate_your_mate
+    password: secret
+    database: rate_your_mate
+```
+
+#### MySQL mit externem Secret (empfohlen für Produktion)
+
+```yaml
+database:
+  type: mysql
+  mysql:
+    existingSecret:
+      name: mysql-credentials
+      keys:
+        host: mysql-host
+        port: mysql-port
+        user: mysql-user
+        password: mysql-password
+        database: mysql-database
+```
+
+#### MySQL TLS-Konfiguration
+
+```yaml
+database:
+  type: mysql
+  mysql:
+    # ... andere Optionen
+    tls:
+      enabled: true
+      skipVerify: false  # Auf true setzen um Hostname-Verifikation zu überspringen
+      caSecret:
+        name: mysql-ca-cert
+        key: ca.crt
+```
+
+#### MySQL Connection Pool
+
+```yaml
+database:
+  type: mysql
+  mysql:
+    pool:
+      maxOpenConns: 25      # Maximale offene Verbindungen
+      maxIdleConns: 5       # Maximale idle Verbindungen
+      connMaxLifetime: 5m   # Maximale Lebensdauer einer Verbindung
+      connMaxIdleTime: 1m   # Maximale Idle-Zeit einer Verbindung
+```
+
+### Umgebungsvariablen (für lokale Entwicklung)
+
+```bash
+# Datenbank-Auswahl
+DB_TYPE=mysql                    # "sqlite" oder "mysql" (Default: sqlite)
+DB_PATH=data/rate-your-mate.db   # SQLite Datenbankpfad
+
+# MySQL-Konfiguration
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=rate_your_mate
+MYSQL_PASSWORD=secret
+MYSQL_DATABASE=rate_your_mate
+
+# MySQL TLS
+MYSQL_TLS_ENABLED=false
+MYSQL_TLS_SKIP_VERIFY=false
+MYSQL_TLS_CA_CERT=/path/to/ca.pem
+
+# MySQL Connection Pool
+MYSQL_MAX_OPEN_CONNS=25
+MYSQL_MAX_IDLE_CONNS=5
+MYSQL_CONN_MAX_LIFETIME=5m
+MYSQL_CONN_MAX_IDLE_TIME=1m
+```
 
 ## 🎨 Credits
 

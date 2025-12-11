@@ -36,7 +36,7 @@ backend:
     requests:
       cpu: 250m
       memory: 256Mi
-  # Persistent storage for SQLite database
+  # Persistent storage for SQLite database (only used when database.type=sqlite)
   persistence:
     enabled: false
     # Storage class - leave empty for default, set to "-" for no storage class
@@ -60,6 +60,53 @@ backend:
     # Find App IDs at https://steamdb.info/ or in Steam Store URLs
     # Examples: 730 (CS2), 252490 (Rust), 4000 (Garry's Mod), 945360 (Among Us)
     PINNED_GAME_IDS: ""
+
+# Database configuration
+database:
+  # Database type: "sqlite" or "mysql"
+  type: sqlite
+
+  # SQLite configuration (only used when type=sqlite)
+  sqlite:
+    # Path to the SQLite database file (relative to persistence.mountPath)
+    path: /app/data/rate-your-mate.db
+
+  # MySQL configuration (only used when type=mysql)
+  mysql:
+    # External secret for MySQL credentials (recommended for production)
+    # If set, values from this secret will be used instead of inline values
+    existingSecret:
+      name: ""
+      keys:
+        host: "mysql-host"
+        port: "mysql-port"
+        user: "mysql-user"
+        password: "mysql-password"
+        database: "mysql-database"
+
+    # Inline MySQL configuration (used if existingSecret.name is empty)
+    host: ""
+    port: 3306
+    user: ""
+    password: ""
+    database: "rate_your_mate"
+
+    # TLS configuration
+    tls:
+      enabled: false
+      # Skip hostname verification (still validates against CA)
+      skipVerify: false
+      # Optional: Secret containing CA certificate
+      caSecret:
+        name: ""
+        key: "ca.crt"
+
+    # Connection pool configuration
+    pool:
+      maxOpenConns: 25
+      maxIdleConns: 5
+      connMaxLifetime: "5m"
+      connMaxIdleTime: "1m"
 
 secrets:
   # Set to false if you manage secrets externally
