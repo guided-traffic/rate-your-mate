@@ -5,6 +5,7 @@
     ":semanticCommits",
     ":dependencyDashboard"
   ],
+  "semanticCommitType": "fix",
   "labels": ["dependencies"],
   "timezone": "Europe/Berlin",
   "schedule": ["at any time"],
