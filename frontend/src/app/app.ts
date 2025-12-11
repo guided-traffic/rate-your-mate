@@ -2,6 +2,7 @@ import { Component, inject, OnInit, OnDestroy, effect } from '@angular/core';
 import { RouterOutlet, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { HeaderComponent } from './components/header/header.component';
+import { FooterComponent } from './components/footer/footer';
 import { NotificationsComponent } from './components/notifications/notifications.component';
 import { LoadingOverlayComponent } from './components/loading-overlay/loading-overlay.component';
 import { AuthService } from './services/auth.service';
@@ -13,7 +14,7 @@ import { ChatService } from './services/chat.service';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, HeaderComponent, NotificationsComponent, LoadingOverlayComponent],
+  imports: [CommonModule, RouterOutlet, RouterLink, HeaderComponent, FooterComponent, NotificationsComponent, LoadingOverlayComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })

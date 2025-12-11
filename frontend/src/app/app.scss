@@ -1,13 +1,16 @@
 @use 'variables' as *;
 
 :host {
-  display: block;
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
   background: $bg-primary;
 }
 
 main {
-  min-height: 100vh;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 
   &.with-header {
     padding-top: 80px; // Header height + margin
