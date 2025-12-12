@@ -1,0 +1,2 @@
+-- SQLite doesn't need migration - TEXT columns have no length limit
+-- This file exists for consistency with MySQL migrations
