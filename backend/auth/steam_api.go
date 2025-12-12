@@ -54,6 +54,11 @@ func NewSteamAPIClient(apiKey string) *SteamAPIClient {
 
 // GetPlayerSummary fetches a single player's profile data
 func (c *SteamAPIClient) GetPlayerSummary(steamID string) (*SteamPlayer, error) {
+	// Skip fake users (used for development/testing)
+	if strings.HasPrefix(steamID, "FAKE_") {
+		return nil, fmt.Errorf("fake user: %s", steamID)
+	}
+
 	players, err := c.GetPlayerSummaries([]string{steamID})
 	if err != nil {
 		return nil, err
@@ -72,7 +77,19 @@ func (c *SteamAPIClient) GetPlayerSummaries(steamIDs []string) ([]SteamPlayer, e
 		return nil, fmt.Errorf("no Steam IDs provided")
 	}
 
-	if len(steamIDs) > 100 {
+	// Filter out fake users (used for development/testing)
+	realSteamIDs := make([]string, 0, len(steamIDs))
+	for _, id := range steamIDs {
+		if !strings.HasPrefix(id, "FAKE_") {
+			realSteamIDs = append(realSteamIDs, id)
+		}
+	}
+
+	if len(realSteamIDs) == 0 {
+		return []SteamPlayer{}, nil
+	}
+
+	if len(realSteamIDs) > 100 {
 		return nil, fmt.Errorf("maximum 100 Steam IDs allowed per request")
 	}
 
@@ -85,7 +102,7 @@ func (c *SteamAPIClient) GetPlayerSummaries(steamIDs []string) ([]SteamPlayer, e
 		"%s/ISteamUser/GetPlayerSummaries/v2/?key=%s&steamids=%s",
 		steamAPIBaseURL,
 		c.apiKey,
-		strings.Join(steamIDs, ","),
+		strings.Join(realSteamIDs, ","),
 	)
 
 	// Make the request

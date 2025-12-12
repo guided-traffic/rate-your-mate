@@ -353,6 +353,12 @@ type ownedGamesResponse struct {
 
 // fetchUserGames fetches all games owned by a user
 func (s *GameService) fetchUserGames(steamID string) ([]models.GameOwnership, error) {
+	// Skip fake users (used for development/testing)
+	if strings.HasPrefix(steamID, "FAKE_") {
+		log.Printf("Skipping Steam API call for fake user: %s", steamID)
+		return []models.GameOwnership{}, nil
+	}
+
 	if s.cfg.SteamAPIKey == "" {
 		return nil, fmt.Errorf("Steam API key not configured")
 	}
