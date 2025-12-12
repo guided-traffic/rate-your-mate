@@ -16,6 +16,7 @@ export interface VotePayload {
   achievement_id: string;
   achievement_name: string;
   is_positive: boolean;
+  is_secret: boolean;
   created_at: string;
 }
 
@@ -23,6 +24,7 @@ export interface SettingsPayload {
   credit_interval_minutes: number;
   credit_max: number;
   voting_paused: boolean;
+  vote_visibility_mode: 'user_choice' | 'all_secret' | 'all_public';
 }
 
 export interface CreditActionPayload {

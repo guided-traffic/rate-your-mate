@@ -175,6 +175,66 @@ import { GameService } from '../../services/game.service';
               </button>
             </div>
 
+            <div class="visibility-card">
+              <h3>👁️ Abstimmungs-Sichtbarkeit</h3>
+              <p class="action-description">
+                Steuere, ob Abstimmungen anonym oder öffentlich angezeigt werden.
+              </p>
+              <div class="visibility-options">
+                <label class="visibility-option" [class.active]="voteVisibilityMode() === 'all_secret'">
+                  <input
+                    type="radio"
+                    name="visibility"
+                    value="all_secret"
+                    [checked]="voteVisibilityMode() === 'all_secret'"
+                    (change)="setVoteVisibilityMode('all_secret')"
+                    [disabled]="updatingVisibility()"
+                  />
+                  <span class="option-icon">🕵️</span>
+                  <span class="option-text">
+                    <strong>Alles geheim</strong>
+                    <small>Alle Abstimmungen sind anonym</small>
+                  </span>
+                </label>
+                <label class="visibility-option" [class.active]="voteVisibilityMode() === 'user_choice'">
+                  <input
+                    type="radio"
+                    name="visibility"
+                    value="user_choice"
+                    [checked]="voteVisibilityMode() === 'user_choice'"
+                    (change)="setVoteVisibilityMode('user_choice')"
+                    [disabled]="updatingVisibility()"
+                  />
+                  <span class="option-icon">🎯</span>
+                  <span class="option-text">
+                    <strong>Nutzer-Wahl</strong>
+                    <small>Spieler entscheiden selbst</small>
+                  </span>
+                </label>
+                <label class="visibility-option" [class.active]="voteVisibilityMode() === 'all_public'">
+                  <input
+                    type="radio"
+                    name="visibility"
+                    value="all_public"
+                    [checked]="voteVisibilityMode() === 'all_public'"
+                    (change)="setVoteVisibilityMode('all_public')"
+                    [disabled]="updatingVisibility()"
+                  />
+                  <span class="option-icon">👁️</span>
+                  <span class="option-text">
+                    <strong>Alles offen</strong>
+                    <small>Alle Abstimmungen sind sichtbar</small>
+                  </span>
+                </label>
+              </div>
+              @if (updatingVisibility()) {
+                <div class="loading-inline visibility-loading">
+                  <div class="spinner"></div>
+                  <span>Wird aktualisiert...</span>
+                </div>
+              }
+            </div>
+
             <div class="credit-actions-card">
               <h3>💰 Credit Aktionen</h3>
               <p class="action-description">
@@ -1093,6 +1153,84 @@ import { GameService } from '../../services/game.service';
       }
     }
 
+    /* Visibility Mode Card */
+    .visibility-card {
+      background: $bg-card;
+      border: 1px solid $border-color;
+      border-radius: $radius-lg;
+      padding: 24px;
+      margin-bottom: 24px;
+
+      h3 {
+        font-size: 18px;
+        font-weight: 600;
+        color: $text-primary;
+        margin-bottom: 8px;
+      }
+    }
+
+    .visibility-options {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .visibility-option {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      background: $bg-tertiary;
+      border: 2px solid $border-color;
+      border-radius: $radius-md;
+      cursor: pointer;
+      transition: all $transition-fast;
+
+      input[type="radio"] {
+        display: none;
+      }
+
+      .option-icon {
+        font-size: 24px;
+      }
+
+      .option-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+
+        strong {
+          font-size: 15px;
+          color: $text-primary;
+        }
+
+        small {
+          font-size: 13px;
+          color: $text-secondary;
+        }
+      }
+
+      &:hover:not(.active) {
+        border-color: $border-light;
+        background: rgba($accent-primary, 0.05);
+      }
+
+      &.active {
+        border-color: $accent-primary;
+        background: rgba($accent-primary, 0.1);
+
+        .option-text strong {
+          color: $accent-primary;
+        }
+      }
+    }
+
+    .visibility-loading {
+      margin-top: 12px;
+      justify-content: center;
+    }
+
     /* Player Management Styles */
     .player-management-card {
       background: $bg-card;
@@ -1374,6 +1512,8 @@ export class AdminComponent implements OnInit, AfterViewChecked {
   invalidatingCache = signal(false);
   deletingVotes = signal(false);
   confirmingDeleteVotes = signal(false);
+  voteVisibilityMode = signal<'user_choice' | 'all_secret' | 'all_public'>('user_choice');
+  updatingVisibility = signal(false);
 
   // Player management
   allUsers = signal<AdminUserInfo[]>([]);
@@ -1477,6 +1617,7 @@ export class AdminComponent implements OnInit, AfterViewChecked {
         this.creditIntervalMinutes = settings.credit_interval_minutes;
         this.creditMax = settings.credit_max;
         this.votingPaused.set(settings.voting_paused);
+        this.voteVisibilityMode.set(settings.vote_visibility_mode || 'user_choice');
         this.originalCreditIntervalMinutes = settings.credit_interval_minutes;
         this.originalCreditMax = settings.credit_max;
         this.loading.set(false);
@@ -1576,6 +1717,31 @@ export class AdminComponent implements OnInit, AfterViewChecked {
         console.error('Failed to toggle voting pause:', err);
         this.togglingPause.set(false);
         this.notifications.error('❌ Fehler', 'Status konnte nicht geändert werden');
+      }
+    });
+  }
+
+  setVoteVisibilityMode(mode: 'user_choice' | 'all_secret' | 'all_public'): void {
+    if (this.voteVisibilityMode() === mode) return;
+
+    this.updatingVisibility.set(true);
+
+    this.settingsService.updateSettings({ vote_visibility_mode: mode }).subscribe({
+      next: (settings) => {
+        this.voteVisibilityMode.set(settings.vote_visibility_mode || 'user_choice');
+        this.updatingVisibility.set(false);
+
+        const modeLabels: Record<string, string> = {
+          'all_secret': 'Alles geheim',
+          'user_choice': 'Nutzer-Wahl',
+          'all_public': 'Alles offen'
+        };
+        this.notifications.success('👁️ Sichtbarkeit geändert', `Modus: ${modeLabels[mode]}`);
+      },
+      error: (err) => {
+        console.error('Failed to update visibility mode:', err);
+        this.updatingVisibility.set(false);
+        this.notifications.error('❌ Fehler', 'Sichtbarkeit konnte nicht geändert werden');
       }
     });
   }

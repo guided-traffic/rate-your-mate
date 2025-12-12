@@ -528,17 +528,25 @@ export class HeaderComponent implements OnInit, OnDestroy {
     // Listen for settings updates from admin
     this.settingsSubscription = this.ws.settingsUpdate$.subscribe((settings) => {
       console.log('Settings updated via WebSocket:', settings);
+
+      // Check if voting_paused status actually changed before showing notification
+      const wasVotingPaused = this.settingsService.votingPaused();
+      const isNowPaused = settings.voting_paused;
+
       this.settingsMaxCredits.set(settings.credit_max);
       this.settingsCreditIntervalSeconds.set(settings.credit_interval_minutes * 60);
       this.settingsService.applySettingsUpdate(settings);
 
-      if (settings.voting_paused) {
-        this.notifications.info('⏸️ Voting pausiert', 'Der Admin hat das Voting pausiert');
-      } else {
-        this.notifications.info('▶️ Voting fortgesetzt', 'Das Voting wurde wieder aktiviert');
-        // Refresh user data to get current credit state after voting is resumed
-        // This ensures the timer starts with the correct value from the backend
-        this.auth.refreshUser();
+      // Only show notification if voting_paused status actually changed
+      if (wasVotingPaused !== isNowPaused) {
+        if (isNowPaused) {
+          this.notifications.info('⏸️ Voting pausiert', 'Der Admin hat das Voting pausiert');
+        } else {
+          this.notifications.info('▶️ Voting fortgesetzt', 'Das Voting wurde wieder aktiviert');
+          // Refresh user data to get current credit state after voting is resumed
+          // This ensures the timer starts with the correct value from the backend
+          this.auth.refreshUser();
+        }
       }
     });
 

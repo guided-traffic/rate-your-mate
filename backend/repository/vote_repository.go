@@ -20,9 +20,9 @@ func NewVoteRepository() *VoteRepository {
 func (r *VoteRepository) Create(vote *models.Vote) error {
 	return database.WithRetry(func() error {
 		result, err := database.DB.Exec(`
-			INSERT INTO votes (from_user_id, to_user_id, achievement_id, points)
-			VALUES (?, ?, ?, ?)`,
-			vote.FromUserID, vote.ToUserID, vote.AchievementID, vote.Points,
+			INSERT INTO votes (from_user_id, to_user_id, achievement_id, points, is_secret)
+			VALUES (?, ?, ?, ?, ?)`,
+			vote.FromUserID, vote.ToUserID, vote.AchievementID, vote.Points, vote.IsSecret,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create vote: %w", err)
@@ -42,7 +42,7 @@ func (r *VoteRepository) Create(vote *models.Vote) error {
 func (r *VoteRepository) GetRecent(limit int) ([]models.VoteWithDetails, error) {
 	rows, err := database.DB.Query(`
 		SELECT
-			v.id, v.achievement_id, v.points, v.created_at,
+			v.id, v.achievement_id, v.points, v.is_secret, v.created_at,
 			fu.id, fu.steam_id, fu.username, fu.avatar_url, fu.avatar_small, fu.profile_url,
 			tu.id, tu.steam_id, tu.username, tu.avatar_url, tu.avatar_small, tu.profile_url
 		FROM votes v
@@ -59,7 +59,7 @@ func (r *VoteRepository) GetRecent(limit int) ([]models.VoteWithDetails, error) 
 	for rows.Next() {
 		var v models.VoteWithDetails
 		err := rows.Scan(
-			&v.ID, &v.AchievementID, &v.Points, &v.CreatedAt,
+			&v.ID, &v.AchievementID, &v.Points, &v.IsSecret, &v.CreatedAt,
 			&v.FromUser.ID, &v.FromUser.SteamID, &v.FromUser.Username, &v.FromUser.AvatarURL, &v.FromUser.AvatarSmall, &v.FromUser.ProfileURL,
 			&v.ToUser.ID, &v.ToUser.SteamID, &v.ToUser.Username, &v.ToUser.AvatarURL, &v.ToUser.AvatarSmall, &v.ToUser.ProfileURL,
 		)
@@ -83,7 +83,7 @@ func (r *VoteRepository) GetByID(id uint64) (*models.VoteWithDetails, error) {
 	var v models.VoteWithDetails
 	err := database.DB.QueryRow(`
 		SELECT
-			v.id, v.achievement_id, v.points, v.created_at,
+			v.id, v.achievement_id, v.points, v.is_secret, v.created_at,
 			fu.id, fu.steam_id, fu.username, fu.avatar_url, fu.avatar_small, fu.profile_url,
 			tu.id, tu.steam_id, tu.username, tu.avatar_url, tu.avatar_small, tu.profile_url
 		FROM votes v
@@ -91,7 +91,7 @@ func (r *VoteRepository) GetByID(id uint64) (*models.VoteWithDetails, error) {
 		JOIN users tu ON v.to_user_id = tu.id
 		WHERE v.id = ?`, id,
 	).Scan(
-		&v.ID, &v.AchievementID, &v.Points, &v.CreatedAt,
+		&v.ID, &v.AchievementID, &v.Points, &v.IsSecret, &v.CreatedAt,
 		&v.FromUser.ID, &v.FromUser.SteamID, &v.FromUser.Username, &v.FromUser.AvatarURL, &v.FromUser.AvatarSmall, &v.FromUser.ProfileURL,
 		&v.ToUser.ID, &v.ToUser.SteamID, &v.ToUser.Username, &v.ToUser.AvatarURL, &v.ToUser.AvatarSmall, &v.ToUser.ProfileURL,
 	)
@@ -188,7 +188,7 @@ func (r *VoteRepository) GetLeaderboard(topN int) ([]AchievementLeaderboard, err
 func (r *VoteRepository) GetVotesForUser(userID uint64) ([]models.VoteWithDetails, error) {
 	rows, err := database.DB.Query(`
 		SELECT
-			v.id, v.achievement_id, v.points, v.created_at,
+			v.id, v.achievement_id, v.points, v.is_secret, v.created_at,
 			fu.id, fu.steam_id, fu.username, fu.avatar_url, fu.avatar_small, fu.profile_url,
 			tu.id, tu.steam_id, tu.username, tu.avatar_url, tu.avatar_small, tu.profile_url
 		FROM votes v
@@ -205,7 +205,7 @@ func (r *VoteRepository) GetVotesForUser(userID uint64) ([]models.VoteWithDetail
 	for rows.Next() {
 		var v models.VoteWithDetails
 		err := rows.Scan(
-			&v.ID, &v.AchievementID, &v.Points, &v.CreatedAt,
+			&v.ID, &v.AchievementID, &v.Points, &v.IsSecret, &v.CreatedAt,
 			&v.FromUser.ID, &v.FromUser.SteamID, &v.FromUser.Username, &v.FromUser.AvatarURL, &v.FromUser.AvatarSmall, &v.FromUser.ProfileURL,
 			&v.ToUser.ID, &v.ToUser.SteamID, &v.ToUser.Username, &v.ToUser.AvatarURL, &v.ToUser.AvatarSmall, &v.ToUser.ProfileURL,
 		)

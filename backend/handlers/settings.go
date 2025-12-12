@@ -33,16 +33,18 @@ func NewSettingsHandler(cfg *config.Config, wsHub *websocket.Hub, userRepo *repo
 
 // GetSettingsRequest represents the response for GET /settings
 type GetSettingsResponse struct {
-	CreditIntervalMinutes int  `json:"credit_interval_minutes"`
-	CreditMax             int  `json:"credit_max"`
-	VotingPaused          bool `json:"voting_paused"`
+	CreditIntervalMinutes int    `json:"credit_interval_minutes"`
+	CreditMax             int    `json:"credit_max"`
+	VotingPaused          bool   `json:"voting_paused"`
+	VoteVisibilityMode    string `json:"vote_visibility_mode"` // "user_choice", "all_secret", "all_public"
 }
 
 // UpdateSettingsRequest represents the request body for PUT /settings
 type UpdateSettingsRequest struct {
-	CreditIntervalMinutes *int  `json:"credit_interval_minutes"`
-	CreditMax             *int  `json:"credit_max"`
-	VotingPaused          *bool `json:"voting_paused"`
+	CreditIntervalMinutes *int    `json:"credit_interval_minutes"`
+	CreditMax             *int    `json:"credit_max"`
+	VotingPaused          *bool   `json:"voting_paused"`
+	VoteVisibilityMode    *string `json:"vote_visibility_mode"` // "user_choice", "all_secret", "all_public"
 }
 
 // VotingStatusResponse represents the response for GET /voting-status
@@ -65,6 +67,7 @@ func (h *SettingsHandler) GetSettings(c *gin.Context) {
 		CreditIntervalMinutes: h.cfg.CreditIntervalMinutes,
 		CreditMax:             h.cfg.CreditMax,
 		VotingPaused:          h.cfg.VotingPaused,
+		VoteVisibilityMode:    h.cfg.VoteVisibilityMode,
 	})
 }
 
@@ -135,12 +138,26 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 		}
 	}
 
+	if req.VoteVisibilityMode != nil {
+		validModes := map[string]bool{"user_choice": true, "all_secret": true, "all_public": true}
+		if !validModes[*req.VoteVisibilityMode] {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "vote_visibility_mode must be 'user_choice', 'all_secret', or 'all_public'",
+			})
+			return
+		}
+		h.cfg.VoteVisibilityMode = *req.VoteVisibilityMode
+		updated = true
+		log.Printf("Admin updated vote_visibility_mode to %s", *req.VoteVisibilityMode)
+	}
+
 	// Broadcast settings change to all connected clients
 	if updated {
 		h.wsHub.BroadcastSettingsUpdate(&websocket.SettingsPayload{
 			CreditIntervalMinutes: h.cfg.CreditIntervalMinutes,
 			CreditMax:             h.cfg.CreditMax,
 			VotingPaused:          h.cfg.VotingPaused,
+			VoteVisibilityMode:    h.cfg.VoteVisibilityMode,
 		})
 	}
 
@@ -148,6 +165,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 		CreditIntervalMinutes: h.cfg.CreditIntervalMinutes,
 		CreditMax:             h.cfg.CreditMax,
 		VotingPaused:          h.cfg.VotingPaused,
+		VoteVisibilityMode:    h.cfg.VoteVisibilityMode,
 	})
 }
 

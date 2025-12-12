@@ -60,15 +60,17 @@ type VotePayload struct {
 	AchievementID string `json:"achievement_id"`
 	Achievement   string `json:"achievement_name"`
 	IsPositive    bool   `json:"is_positive"`
+	IsSecret      bool   `json:"is_secret"`
 	CreatedAt     string `json:"created_at"`
 	Points        int    `json:"points,omitempty"` // Number of points awarded (1-3)
 }
 
 // SettingsPayload contains settings information for broadcasts
 type SettingsPayload struct {
-	CreditIntervalMinutes int  `json:"credit_interval_minutes"`
-	CreditMax             int  `json:"credit_max"`
-	VotingPaused          bool `json:"voting_paused"`
+	CreditIntervalMinutes int    `json:"credit_interval_minutes"`
+	CreditMax             int    `json:"credit_max"`
+	VotingPaused          bool   `json:"voting_paused"`
+	VoteVisibilityMode    string `json:"vote_visibility_mode"` // "user_choice", "all_secret", "all_public"
 }
 
 // ChatMessagePayload contains chat message information for broadcasts

@@ -271,14 +271,17 @@ export class TimelineComponent implements OnInit, OnDestroy {
   newVoteIds = signal<Set<number>>(new Set());
 
   private wsSubscription?: Subscription;
+  private settingsSubscription?: Subscription;
 
   ngOnInit(): void {
     this.loadVotes();
     this.subscribeToLiveVotes();
+    this.subscribeToSettingsUpdates();
   }
 
   ngOnDestroy(): void {
     this.wsSubscription?.unsubscribe();
+    this.settingsSubscription?.unsubscribe();
   }
 
   loadVotes(): void {
@@ -322,6 +325,19 @@ export class TimelineComponent implements OnInit, OnDestroy {
               this.newVoteIds.set(currentIds);
             }, 3000);
           }
+        }
+      });
+    });
+  }
+
+  subscribeToSettingsUpdates(): void {
+    // Subscribe to settings updates - reload votes when visibility mode changes
+    this.settingsSubscription = this.wsService.settingsUpdate$.subscribe((settings) => {
+      console.log('Timeline: Settings updated, reloading votes');
+      // Reload votes to reflect new visibility mode
+      this.voteService.getAll().subscribe({
+        next: (votes) => {
+          this.votes.set(votes);
         }
       });
     });

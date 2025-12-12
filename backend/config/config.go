@@ -47,8 +47,9 @@ type Config struct {
 	CreditMax             int
 
 	// Voting
-	VotingPaused   bool
-	VotingPausedAt time.Time // Timestamp when voting was paused (for freezing credit generation)
+	VotingPaused       bool
+	VotingPausedAt     time.Time // Timestamp when voting was paused (for freezing credit generation)
+	VoteVisibilityMode string    // "user_choice", "all_secret", "all_public" - Default: user_choice
 
 	// Admin
 	AdminSteamIDs []string
@@ -97,6 +98,9 @@ func Load() *Config {
 		// Credits
 		CreditIntervalMinutes: getEnvAsInt("CREDIT_INTERVAL_MINUTES", 10),
 		CreditMax:             getEnvAsInt("CREDIT_MAX", 10),
+
+		// Voting visibility - default to user choice
+		VoteVisibilityMode: getEnv("VOTE_VISIBILITY_MODE", "user_choice"),
 
 		// Admin
 		AdminSteamIDs: getEnvAsStringSlice("ADMIN_STEAM_IDS", []string{}),

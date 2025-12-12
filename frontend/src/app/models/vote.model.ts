@@ -8,6 +8,7 @@ export interface Vote {
   achievement_id: string;
   achievement: Achievement;
   points: number;
+  is_secret: boolean;
   created_at: string;
 }
 
@@ -15,6 +16,7 @@ export interface CreateVoteRequest {
   to_user_id: number;
   achievement_id: string;
   points?: number; // 1-3 points, defaults to 1
+  is_secret?: boolean; // null = use default (negative=secret, positive=open)
 }
 
 export interface VoteResponse {

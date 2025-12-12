@@ -155,12 +155,21 @@ func (h *VoteHandler) Create(c *gin.Context) {
 		}
 	}
 
+	// Determine if vote is secret:
+	// - If is_secret is explicitly set in request, use that value
+	// - Otherwise: negative achievements default to secret, positive to open
+	isSecret := !achievement.IsPositive // default: negative=secret, positive=open
+	if req.IsSecret != nil {
+		isSecret = *req.IsSecret
+	}
+
 	// Create a single vote with points value
 	vote := &models.Vote{
 		FromUserID:    fromUserID,
 		ToUserID:      req.ToUserID,
 		AchievementID: req.AchievementID,
 		Points:        points,
+		IsSecret:      isSecret,
 	}
 
 	if err := h.voteRepo.Create(vote); err != nil {
@@ -180,17 +189,40 @@ func (h *VoteHandler) Create(c *gin.Context) {
 	// Broadcast vote to all WebSocket clients (once, with points info)
 	if voteDetails != nil && h.wsHub != nil {
 		achievement, _ := models.GetAchievement(voteDetails.AchievementID)
+
+		// Determine if sender should be anonymized based on visibility mode
+		shouldAnonymize := false
+		switch h.cfg.VoteVisibilityMode {
+		case "all_secret":
+			shouldAnonymize = true
+		case "all_public":
+			shouldAnonymize = false
+		default: // "user_choice"
+			shouldAnonymize = isSecret
+		}
+
+		// Prepare payload - anonymize sender if needed
+		fromUserID := voteDetails.FromUser.ID
+		fromUsername := voteDetails.FromUser.Username
+		fromAvatar := voteDetails.FromUser.AvatarSmall
+		if shouldAnonymize {
+			fromUserID = 0
+			fromUsername = "Anonym"
+			fromAvatar = ""
+		}
+
 		payload := &websocket.VotePayload{
 			VoteID:        voteDetails.ID,
-			FromUserID:    voteDetails.FromUser.ID,
-			FromUsername:  voteDetails.FromUser.Username,
-			FromAvatar:    voteDetails.FromUser.AvatarSmall,
+			FromUserID:    fromUserID,
+			FromUsername:  fromUsername,
+			FromAvatar:    fromAvatar,
 			ToUserID:      voteDetails.ToUser.ID,
 			ToUsername:    voteDetails.ToUser.Username,
 			ToAvatar:      voteDetails.ToUser.AvatarSmall,
 			AchievementID: voteDetails.AchievementID,
 			Achievement:   achievement.Name,
 			IsPositive:    achievement.IsPositive,
+			IsSecret:      shouldAnonymize,
 			CreatedAt:     voteDetails.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			Points:        points,
 		}
@@ -238,6 +270,11 @@ func (h *VoteHandler) GetTimeline(c *gin.Context) {
 
 	if votes == nil {
 		votes = []models.VoteWithDetails{}
+	}
+
+	// Apply visibility mode to all votes
+	for i := range votes {
+		votes[i].ApplyVisibilityMode(h.cfg.VoteVisibilityMode)
 	}
 
 	c.JSON(http.StatusOK, gin.H{

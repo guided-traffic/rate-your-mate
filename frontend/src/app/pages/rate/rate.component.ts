@@ -183,6 +183,25 @@ import { Achievement } from '../../models/achievement.model';
               <span class="points-value">{{ selectedPoints() }} {{ selectedPoints() === 1 ? 'Punkt' : 'Punkte' }}</span>
             </div>
 
+            <div class="secret-toggle">
+              <label class="toggle-container" (click)="toggleSecret()">
+                <span class="toggle-switch" [class.active]="isSecretVote()">
+                  <span class="toggle-slider"></span>
+                </span>
+                <span class="toggle-label">
+                  <span class="toggle-icon">{{ isSecretVote() ? '🕵️' : '👁️' }}</span>
+                  {{ isSecretVote() ? 'Geheim abstimmen' : 'Offen abstimmen' }}
+                </span>
+              </label>
+              <span class="toggle-hint">
+                @if (isSecretVote()) {
+                  Dein Name wird nicht angezeigt
+                } @else {
+                  Alle sehen, dass du abgestimmt hast
+                }
+              </span>
+            </div>
+
             <button
               class="btn btn-primary btn-lg"
               [disabled]="submitting() || auth.credits() < selectedPoints() || votingPaused()"
@@ -540,6 +559,74 @@ import { Achievement } from '../../models/achievement.model';
         color: $accent-primary;
       }
     }
+
+    .secret-toggle {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 16px;
+      border-radius: $radius-md;
+      width: 100%;
+      max-width: 300px;
+
+      .toggle-container {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .toggle-switch {
+        position: relative;
+        width: 48px;
+        height: 26px;
+        background: $bg-card;
+        border: 2px solid $border-color;
+        border-radius: 13px;
+        transition: all $transition-fast;
+
+        .toggle-slider {
+          position: absolute;
+          top: 2px;
+          left: 2px;
+          width: 18px;
+          height: 18px;
+          background: $text-secondary;
+          border-radius: 50%;
+          transition: all $transition-fast;
+        }
+
+        &.active {
+          background: rgba($accent-primary, 0.2);
+          border-color: $accent-primary;
+
+          .toggle-slider {
+            left: 24px;
+            background: $accent-primary;
+          }
+        }
+      }
+
+      .toggle-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+        font-size: 14px;
+
+        .toggle-icon {
+          font-size: 18px;
+        }
+      }
+
+      .toggle-hint {
+        font-size: 12px;
+        color: $text-muted;
+        text-align: center;
+      }
+    }
   `]
 })
 export class RateComponent implements OnInit {
@@ -564,6 +651,7 @@ export class RateComponent implements OnInit {
   selectedUser = signal<User | null>(null);
   selectedAchievement = signal<Achievement | null>(null);
   selectedPoints = signal(1);
+  isSecretVote = signal(false); // Will be set based on achievement type
 
   ngOnInit(): void {
     this.loadUsers();
@@ -604,12 +692,19 @@ export class RateComponent implements OnInit {
   selectAchievement(achievement: Achievement): void {
     this.selectedAchievement.set(achievement);
     this.selectedPoints.set(1);
+    // Default: negative achievements are secret, positive are open
+    this.isSecretVote.set(!achievement.is_positive);
+  }
+
+  toggleSecret(): void {
+    this.isSecretVote.update(v => !v);
   }
 
   submitVote(): void {
     const user = this.selectedUser();
     const achievement = this.selectedAchievement();
     const points = this.selectedPoints();
+    const isSecret = this.isSecretVote();
 
     if (!user || !achievement) return;
 
@@ -618,19 +713,22 @@ export class RateComponent implements OnInit {
     this.voteService.create({
       to_user_id: user.id,
       achievement_id: achievement.id,
-      points: points
+      points: points,
+      is_secret: isSecret
     }).subscribe({
       next: (response) => {
         this.soundService.playReviewGiven();
         const pointsText = points === 1 ? '1 Punkt' : `${points} Punkte`;
+        const secretText = isSecret ? ' (geheim)' : '';
         this.notifications.success(
           'Bewertung abgegeben!',
-          `Du hast ${user.username} ${pointsText} für "${achievement.name}" gegeben.`
+          `Du hast ${user.username} ${pointsText} für "${achievement.name}" gegeben.${secretText}`
         );
         this.auth.updateCredits(response.credits);
         this.selectedUser.set(null);
         this.selectedAchievement.set(null);
         this.selectedPoints.set(1);
+        this.isSecretVote.set(false);
         this.submitting.set(false);
       },
       error: (error) => {
