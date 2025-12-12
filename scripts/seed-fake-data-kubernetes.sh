@@ -41,6 +41,15 @@ echo -e "MySQL:      ${GREEN}$MYSQL_SERVICE${NC}"
 echo -e "Database:   ${GREEN}$MYSQL_DATABASE${NC}"
 echo ""
 
+# Sicherheitsabfrage
+echo -e "${YELLOW}⚠️  WARNUNG: Dies erstellt 15 Fake-Spieler und 300+ Votes in der Kubernetes-Datenbank!${NC}"
+read -p "Bist du sicher? (ja/nein): " confirm
+if [ "$confirm" != "ja" ]; then
+    echo "Abgebrochen."
+    exit 0
+fi
+echo ""
+
 # Prüfen ob kubectl verfügbar ist
 if ! command -v kubectl &> /dev/null; then
     echo -e "${RED}❌ kubectl nicht gefunden. Bitte installieren.${NC}"

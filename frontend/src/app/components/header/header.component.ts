@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, signal, computed, effect, HostListener, ElementRef } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, signal, computed, effect, HostListener, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
@@ -70,7 +70,7 @@ import { Subscription, interval } from 'rxjs';
               <span class="credits-count">{{ auth.credits() }}</span>
             </div>
 
-            <div class="user-menu" (click)="toggleMenu()">
+            <div class="user-menu" #userMenu (click)="toggleMenu()">
               <img
                 [src]="auth.user()?.avatar_small || auth.user()?.avatar_url || '/assets/default-avatar.png'"
                 [alt]="auth.user()?.username"
@@ -646,6 +646,8 @@ export class HeaderComponent implements OnInit, OnDestroy {
   private timerSubscription?: Subscription;
   private timerInitialized = false;
 
+  @ViewChild('userMenu') userMenuRef!: ElementRef;
+
   menuOpen = false;
   copied = signal(false);
 
@@ -920,6 +922,11 @@ export class HeaderComponent implements OnInit, OnDestroy {
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: Event): void {
+    // Close user menu if click is outside
+    if (this.menuOpen && this.userMenuRef && !this.userMenuRef.nativeElement.contains(event.target)) {
+      this.menuOpen = false;
+    }
+
     if (this.rankingOverlayVisible()) {
       this.rankingOverlayVisible.set(false);
     }
