@@ -263,6 +263,7 @@ func (r *UserRepository) ShiftAllLastCreditAt(duration time.Duration) error {
 }
 
 // FindOrCreate finds a user by Steam ID or creates a new one
+// Always updates profile data (username, avatar) on each login to reflect Steam profile changes
 func (r *UserRepository) FindOrCreate(steamID, username, avatarURL, avatarSmall, profileURL string) (*models.User, bool, error) {
 	// Try to find existing user
 	user, err := r.GetBySteamID(steamID)
@@ -271,8 +272,9 @@ func (r *UserRepository) FindOrCreate(steamID, username, avatarURL, avatarSmall,
 	}
 
 	if user != nil {
-		// Update profile data if it changed
-		if user.Username != username || user.AvatarURL != avatarURL {
+		// Always update profile data on login to catch Steam profile changes
+		// This ensures users who set a custom avatar after using default get their new avatar
+		if user.Username != username || user.AvatarURL != avatarURL || user.AvatarSmall != avatarSmall || user.ProfileURL != profileURL {
 			user.Username = username
 			user.AvatarURL = avatarURL
 			user.AvatarSmall = avatarSmall

@@ -101,7 +101,8 @@ generate_votes() {
 
     echo "BEGIN TRANSACTION;" >> "$VOTES_SQL"
 
-    # Zuerst: Viele negative Votes für ToxicAvenger (ca. 25 negative = -25 Punkte)
+    # Zuerst: Viele negative Votes für ToxicAvenger (ca. 25 negative = -25 Punkte netto)
+    # WICHTIG: points ist immer positiv (1-3), die Negativität kommt vom Achievement-Typ!
     for i in {1..25}; do
         local from_idx=$((RANDOM % num_players))
         local from_id=${ids_array[$from_idx]}
@@ -115,7 +116,7 @@ generate_votes() {
         local neg_achievement=${NEGATIVE_ACHIEVEMENTS[$((RANDOM % ${#NEGATIVE_ACHIEVEMENTS[@]}))]}
         local random_hours=$((RANDOM % 48))
 
-        echo "INSERT INTO votes (from_user_id, to_user_id, achievement_id, points, created_at) VALUES ($from_id, $toxic_player_id, '$neg_achievement', -1, datetime('now', '-$random_hours hours', '-' || abs(random() % 60) || ' minutes'));" >> "$VOTES_SQL"
+        echo "INSERT INTO votes (from_user_id, to_user_id, achievement_id, points, created_at) VALUES ($from_id, $toxic_player_id, '$neg_achievement', 1, datetime('now', '-$random_hours hours', '-' || abs(random() % 60) || ' minutes'));" >> "$VOTES_SQL"
         ((total_points--))
     done
 
@@ -132,7 +133,7 @@ generate_votes() {
         local neg_achievement=${NEGATIVE_ACHIEVEMENTS[$((RANDOM % ${#NEGATIVE_ACHIEVEMENTS[@]}))]}
         local random_hours=$((RANDOM % 48))
 
-        echo "INSERT INTO votes (from_user_id, to_user_id, achievement_id, points, created_at) VALUES ($from_id, $teamkiller_id, '$neg_achievement', -1, datetime('now', '-$random_hours hours', '-' || abs(random() % 60) || ' minutes'));" >> "$VOTES_SQL"
+        echo "INSERT INTO votes (from_user_id, to_user_id, achievement_id, points, created_at) VALUES ($from_id, $teamkiller_id, '$neg_achievement', 1, datetime('now', '-$random_hours hours', '-' || abs(random() % 60) || ' minutes'));" >> "$VOTES_SQL"
         ((total_points--))
     done
 
@@ -197,22 +198,23 @@ generate_votes() {
         local to_id=${ids_array[$to_idx]}
 
         # 80% positive, 20% negative
+        # WICHTIG: points ist immer positiv (1-3), die Negativität kommt vom Achievement-Typ!
         local is_positive=$((RANDOM % 100))
         local achievement=""
-        local points=0
+        local net_effect=0
 
         if [ $is_positive -lt 80 ]; then
             achievement=${POSITIVE_ACHIEVEMENTS[$((RANDOM % ${#POSITIVE_ACHIEVEMENTS[@]}))]}
-            points=1
+            net_effect=1
         else
             achievement=${NEGATIVE_ACHIEVEMENTS[$((RANDOM % ${#NEGATIVE_ACHIEVEMENTS[@]}))]}
-            points=-1
+            net_effect=-1
         fi
 
         local random_hours=$((RANDOM % 72))
 
-        echo "INSERT INTO votes (from_user_id, to_user_id, achievement_id, points, created_at) VALUES ($from_id, $to_id, '$achievement', $points, datetime('now', '-$random_hours hours', '-' || abs(random() % 60) || ' minutes'));" >> "$VOTES_SQL"
-        ((remaining -= points))
+        echo "INSERT INTO votes (from_user_id, to_user_id, achievement_id, points, created_at) VALUES ($from_id, $to_id, '$achievement', 1, datetime('now', '-$random_hours hours', '-' || abs(random() % 60) || ' minutes'));" >> "$VOTES_SQL"
+        ((remaining -= net_effect))
     done
 
     echo "COMMIT;" >> "$VOTES_SQL"
@@ -229,18 +231,25 @@ echo "📈 Statistiken:"
 echo "---------------"
 
 # Statistiken ausgeben
+# Negative Achievements: noob, camper, rage-quitter, toxic, afk-king, friendly-fire-expert
 echo ""
-echo "👥 Spieler (nach Punkten sortiert):"
+echo "👥 Spieler (nach NETTO-Punkten sortiert):"
 sqlite3 -header -column "$DB_PATH" <<EOF
 SELECT
     u.username,
-    COALESCE(SUM(v.points), 0) as total_points,
+    COALESCE(SUM(
+        CASE
+            WHEN v.achievement_id IN ('pro-player','teamplayer','clutch-king','support-hero','stratege','good-sport')
+            THEN v.points
+            ELSE -v.points
+        END
+    ), 0) as net_points,
     COUNT(v.id) as vote_count
 FROM users u
 LEFT JOIN votes v ON u.id = v.to_user_id
 WHERE u.steam_id LIKE 'FAKE_%'
 GROUP BY u.id
-ORDER BY total_points DESC;
+ORDER BY net_points DESC;
 EOF
 
 echo ""

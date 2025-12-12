@@ -379,13 +379,13 @@ export class TimelineComponent implements OnInit, OnDestroy {
   }
 
   getPointsArray(points: number): number[] {
-    // Ensure at least 1 point is shown, default to 1 if undefined
-    const count = points || 1;
+    // Use absolute value for negative points, ensure at least 1 is shown
+    const count = Math.abs(points) || 1;
     return Array.from({ length: count }, (_, i) => i);
   }
 
   getPointsLabel(points: number): string {
-    const count = points || 1;
+    const count = Math.abs(points) || 1;
     return count === 1 ? '1 Credit' : `${count} Credits`;
   }
 }

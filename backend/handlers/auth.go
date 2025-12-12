@@ -103,6 +103,14 @@ func (h *AuthHandler) SteamCallback(c *gin.Context) {
 			avatarURL = player.AvatarFull
 			avatarSmall = player.Avatar
 			profileURL = player.ProfileURL
+
+			// Replace Steam default avatar with a generated one
+			if auth.IsDefaultAvatar(avatarURL) {
+				log.Printf("User %s has default Steam avatar, generating fallback", username)
+				avatarURL = auth.GenerateFallbackAvatar(username)
+				avatarSmall = avatarURL // DiceBear SVGs scale well
+			}
+
 			log.Printf("Fetched Steam profile: %s (%s)", username, steamID)
 		}
 	} else {

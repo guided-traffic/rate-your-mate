@@ -10,6 +10,9 @@ import (
 
 const (
 	steamAPIBaseURL = "https://api.steampowered.com"
+
+	// Steam default avatar hash (the blue question mark image)
+	steamDefaultAvatarHash = "fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb"
 )
 
 // SteamPlayer represents a Steam player's profile data
@@ -128,6 +131,25 @@ func (c *SteamAPIClient) GetPlayerSummaries(steamIDs []string) ([]SteamPlayer, e
 // IsConfigured returns true if the API client has a valid API key
 func (c *SteamAPIClient) IsConfigured() bool {
 	return c.apiKey != ""
+}
+
+// IsDefaultAvatar checks if the given avatar URL is the Steam default avatar (blue question mark)
+func IsDefaultAvatar(avatarURL string) bool {
+	return strings.Contains(avatarURL, steamDefaultAvatarHash)
+}
+
+// GenerateFallbackAvatar generates a DiceBear avatar URL based on the username
+func GenerateFallbackAvatar(username string) string {
+	// Use DiceBear's pixel-art style for consistent, fun avatars
+	return fmt.Sprintf("https://api.dicebear.com/7.x/pixel-art/svg?seed=%s", username)
+}
+
+// GetAvatarOrFallback returns the original avatar if it's custom, or a generated fallback if it's the default
+func GetAvatarOrFallback(avatarURL, username string) string {
+	if avatarURL == "" || IsDefaultAvatar(avatarURL) {
+		return GenerateFallbackAvatar(username)
+	}
+	return avatarURL
 }
 
 // CheckConnectivity verifies that the Steam API endpoints are reachable
