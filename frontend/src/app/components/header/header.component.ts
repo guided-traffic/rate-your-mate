@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, signal, computed, effect } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, signal, computed, effect, HostListener, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
@@ -6,6 +6,9 @@ import { WebSocketService } from '../../services/websocket.service';
 import { NotificationService } from '../../services/notification.service';
 import { SettingsService } from '../../services/settings.service';
 import { SoundService } from '../../services/sound.service';
+import { RankingService, PlayerRanking, GlobalRankingResponse } from '../../services/ranking.service';
+import { UserService } from '../../services/user.service';
+import { User } from '../../models/user.model';
 import { Subscription, interval } from 'rxjs';
 
 @Component({
@@ -95,6 +98,54 @@ import { Subscription, interval } from 'rxjs';
                   <button (click)="logout()" class="dropdown-item logout">
                     <span>🚪</span> Logout
                   </button>
+                </div>
+              }
+            </div>
+
+            <div
+              class="rank-badge-container"
+              (click)="toggleRankingOverlay($event)"
+            >
+              <div class="rank-badge" [title]="rankingService.isRankingActive() ? 'Dein aktueller Platz' : 'Noch ' + rankingService.votesUntilRanking() + ' Votes bis zum Ranking'">
+                @if (rankingService.rankDisplay()) {
+                  <span class="rank-number">{{ rankingService.rankDisplay() }}</span>
+                } @else {
+                  <span class="rank-hourglass">⏳</span>
+                }
+              </div>
+
+              @if (rankingOverlayVisible()) {
+                <div class="ranking-overlay" (click)="$event.stopPropagation()">
+                  <div class="ranking-overlay-header">
+                    <span class="ranking-overlay-title">🏆 Spieler-Ranking</span>
+                  </div>
+                  <div class="ranking-chart">
+                    <div class="players-track">
+                      @for (player of sortedPlayers(); track player.user.id; let i = $index) {
+                        <div
+                          class="player-marker"
+                          [style.left.%]="getPlayerPosition(player.net_votes)"
+                          [style.top.%]="getPlayerYPosition(i)"
+                          [style.z-index]="getZIndex(player.net_votes)"
+                          [title]="player.user.username + ': ' + player.net_votes + ' Punkte'"
+                        >
+                          <img
+                            [src]="player.user.avatar_small || player.user.avatar_url || '/assets/default-avatar.png'"
+                            [alt]="player.user.username"
+                            class="player-avatar"
+                            [class]="'player-avatar wobble-' + (i % 6)"
+                          />
+                        </div>
+                      }
+                    </div>
+                    <div class="x-axis">
+                      @for (tick of axisTicks(); track tick) {
+                        <div class="tick" [style.left.%]="getTickPosition(tick)" [class.zero-tick]="tick === 0">
+                          <span class="tick-label">{{ tick }}</span>
+                        </div>
+                      }
+                    </div>
+                  </div>
                 </div>
               }
             </div>
@@ -389,6 +440,183 @@ import { Subscription, interval } from 'rxjs';
       }
     }
 
+    .rank-badge-container {
+      position: relative;
+    }
+
+    .rank-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      background: $gradient-primary;
+      border: 2px solid #FFD700;
+      border-radius: 50%;
+      font-size: 14px;
+      font-weight: 700;
+      color: $text-primary;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), 0 0 8px rgba(255, 215, 0, 0.3);
+      flex-shrink: 0;
+      cursor: pointer;
+
+      .rank-number {
+        line-height: 1;
+      }
+
+      .rank-hourglass {
+        font-size: 16px;
+        line-height: 1;
+      }
+    }
+
+    .ranking-overlay {
+      position: absolute;
+      top: calc(100% + 12px);
+      right: 0;
+      width: 800px;
+      max-height: 90vh;
+      background: $bg-card;
+      border: 1px solid $border-color;
+      border-radius: $radius-lg;
+      box-shadow: $shadow-lg;
+      overflow: hidden;
+      animation: fadeIn 0.2s ease;
+      z-index: 1000;
+    }
+
+    .ranking-overlay-header {
+      padding: 20px 24px;
+      background: $bg-tertiary;
+      border-bottom: 1px solid $border-color;
+    }
+
+    .ranking-overlay-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: $text-primary;
+    }
+
+    .ranking-chart {
+      padding: 20px 24px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .players-track {
+      position: relative;
+      height: 240px;
+      margin-bottom: 8px;
+    }
+
+    .player-marker {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      transition: left 0.3s ease, top 0.3s ease;
+    }
+
+    .player-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid $border-color;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      cursor: pointer;
+
+      &:hover {
+        animation: none !important;
+        transform: scale(1.15);
+        z-index: 1000 !important;
+      }
+    }
+
+    .wobble-0 { animation: wobble0 3.0s ease-in-out infinite; }
+    .wobble-1 { animation: wobble1 3.2s ease-in-out infinite; }
+    .wobble-2 { animation: wobble2 2.8s ease-in-out infinite; }
+    .wobble-3 { animation: wobble3 3.4s ease-in-out infinite; }
+    .wobble-4 { animation: wobble4 2.9s ease-in-out infinite; }
+    .wobble-5 { animation: wobble5 3.1s ease-in-out infinite; }
+
+    @keyframes wobble0 {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(3px, -2px); }
+      50% { transform: translate(-1px, 3px); }
+      75% { transform: translate(-3px, -1px); }
+    }
+
+    @keyframes wobble1 {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(-2px, 3px); }
+      50% { transform: translate(3px, 1px); }
+      75% { transform: translate(1px, -3px); }
+    }
+
+    @keyframes wobble2 {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(2px, 2px); }
+      50% { transform: translate(-3px, -1px); }
+      75% { transform: translate(1px, 3px); }
+    }
+
+    @keyframes wobble3 {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(-3px, -3px); }
+      50% { transform: translate(2px, -2px); }
+      75% { transform: translate(-1px, 3px); }
+    }
+
+    @keyframes wobble4 {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(1px, -3px); }
+      50% { transform: translate(-2px, 2px); }
+      75% { transform: translate(3px, 1px); }
+    }
+
+    @keyframes wobble5 {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(-1px, 2px); }
+      50% { transform: translate(3px, -3px); }
+      75% { transform: translate(-2px, -1px); }
+    }
+
+    .x-axis {
+      position: relative;
+      height: 28px;
+      border-top: 2px solid $border-color;
+    }
+
+    .tick {
+      position: absolute;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+
+      &::before {
+        content: '';
+        width: 1px;
+        height: 8px;
+        background: $border-color;
+      }
+
+      &.zero-tick::before {
+        width: 2px;
+        background: $text-secondary;
+      }
+    }
+
+    .tick-label {
+      font-size: 11px;
+      color: $text-muted;
+      margin-top: 4px;
+      font-weight: 500;
+    }
+
 @keyframes fadeIn {
       from {
         opacity: 0;
@@ -404,6 +632,8 @@ import { Subscription, interval } from 'rxjs';
 export class HeaderComponent implements OnInit, OnDestroy {
   auth = inject(AuthService);
   ws = inject(WebSocketService);
+  rankingService = inject(RankingService);
+  private userService = inject(UserService);
   private router = inject(Router);
   private notifications = inject(NotificationService);
   private settingsService = inject(SettingsService);
@@ -418,6 +648,58 @@ export class HeaderComponent implements OnInit, OnDestroy {
 
   menuOpen = false;
   copied = signal(false);
+
+  // Ranking overlay state
+  rankingOverlayVisible = signal(false);
+  private allPlayers = signal<PlayerRanking[]>([]);
+
+  // Sorted players by username
+  sortedPlayers = computed(() => {
+    return [...this.allPlayers()].sort((a, b) =>
+      a.user.username.toLowerCase().localeCompare(b.user.username.toLowerCase())
+    );
+  });
+
+  // Dynamic axis calculation
+  private axisMin = computed(() => {
+    const players = this.allPlayers();
+    if (players.length === 0) return 0;
+    const minVotes = Math.min(...players.map(p => p.net_votes));
+    // If someone is negative, extend axis to include them (rounded down to nearest 5)
+    if (minVotes < 0) {
+      return Math.floor(minVotes / 5) * 5;
+    }
+    return 0;
+  });
+
+  private axisMax = computed(() => {
+    const players = this.allPlayers();
+    if (players.length === 0) return 10;
+    const maxVotes = Math.max(...players.map(p => p.net_votes), 0);
+    // Start at 10, then increase in 5er steps if someone exceeds
+    if (maxVotes >= 10) {
+      return Math.ceil(maxVotes / 5) * 5;
+    }
+    return 10;
+  });
+
+  // Generate ticks for the x-axis
+  axisTicks = computed(() => {
+    const min = this.axisMin();
+    const max = this.axisMax();
+    const ticks: number[] = [];
+
+    // Add ticks every 5 units, but always include 0
+    for (let i = min; i <= max; i += 5) {
+      ticks.push(i);
+    }
+    // Ensure 0 is included if not already
+    if (!ticks.includes(0)) {
+      ticks.push(0);
+      ticks.sort((a, b) => a - b);
+    }
+    return ticks;
+  });
 
   // Signal for tracking seconds until next credit
   private secondsUntilCredit = signal(0);
@@ -483,6 +765,8 @@ export class HeaderComponent implements OnInit, OnDestroy {
     // Initialize credit timer when authenticated
     if (this.auth.isAuthenticated()) {
       this.initCreditTimer();
+      // Load initial ranking
+      this.rankingService.loadMyRanking();
     }
 
     // Listen for vote notifications - show popup only if current user is the recipient
@@ -504,6 +788,8 @@ export class HeaderComponent implements OnInit, OnDestroy {
         // Refresh user data to update any stats
         this.auth.refreshUser();
       }
+      // Refresh ranking on any new vote
+      this.rankingService.refresh();
     });
 
     // Listen for settings updates from admin
@@ -619,5 +905,64 @@ export class HeaderComponent implements OnInit, OnDestroy {
         setTimeout(() => this.copied.set(false), 2000);
       });
     }
+  }
+
+  // Ranking overlay methods
+  toggleRankingOverlay(event: Event): void {
+    event.stopPropagation();
+    if (this.rankingOverlayVisible()) {
+      this.rankingOverlayVisible.set(false);
+    } else {
+      this.rankingOverlayVisible.set(true);
+      this.loadRankingData();
+    }
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: Event): void {
+    if (this.rankingOverlayVisible()) {
+      this.rankingOverlayVisible.set(false);
+    }
+  }
+
+  private loadRankingData(): void {
+    this.rankingService.loadGlobalRanking().then((response: GlobalRankingResponse) => {
+      this.allPlayers.set(response.rankings);
+    }).catch(err => {
+      console.error('Failed to load ranking data for overlay:', err);
+    });
+  }
+
+  // Calculate the position of a player icon on the track (percentage)
+  getPlayerPosition(netVotes: number): number {
+    const min = this.axisMin();
+    const max = this.axisMax();
+    const range = max - min;
+    if (range === 0) return 50;
+    return ((netVotes - min) / range) * 100;
+  }
+
+  // Calculate the Y position of a player based on their index (sorted by name)
+  getPlayerYPosition(index: number): number {
+    const totalPlayers = this.sortedPlayers().length;
+    if (totalPlayers <= 1) return 50;
+    // Distribute players evenly, with some padding at top and bottom
+    const padding = 10; // 10% padding from edges
+    const availableSpace = 100 - (2 * padding);
+    return padding + (index / (totalPlayers - 1)) * availableSpace;
+  }
+
+  // Calculate z-index based on score (higher score = higher z-index)
+  getZIndex(netVotes: number): number {
+    return 100 + netVotes;
+  }
+
+  // Calculate tick position (percentage)
+  getTickPosition(tick: number): number {
+    const min = this.axisMin();
+    const max = this.axisMax();
+    const range = max - min;
+    if (range === 0) return 0;
+    return ((tick - min) / range) * 100;
   }
 }

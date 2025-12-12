@@ -176,6 +176,10 @@ func main() {
 			protected.GET("/leaderboard", voteHandler.GetLeaderboard)
 			protected.GET("/champions", voteHandler.GetChampions)
 
+			// Global Ranking
+			protected.GET("/ranking", voteHandler.GetGlobalRanking)
+			protected.GET("/ranking/me", voteHandler.GetMyRanking)
+
 			// Games
 			protected.GET("/games", gameHandler.GetMultiplayerGames)
 			protected.POST("/games/refresh", gameHandler.RefreshGames)

@@ -51,6 +51,9 @@ type Config struct {
 	VotingPausedAt     time.Time // Timestamp when voting was paused (for freezing credit generation)
 	VoteVisibilityMode string    // "user_choice", "all_secret", "all_public" - Default: user_choice
 
+	// Ranking
+	MinVotesForRanking int // Minimum total votes before rankings are displayed
+
 	// Admin
 	AdminSteamIDs []string
 	AdminPassword string // Optional password for additional admin panel security
@@ -101,6 +104,9 @@ func Load() *Config {
 
 		// Voting visibility - default to user choice
 		VoteVisibilityMode: getEnv("VOTE_VISIBILITY_MODE", "user_choice"),
+
+		// Ranking
+		MinVotesForRanking: getEnvAsInt("MIN_VOTES_FOR_RANKING", 10),
 
 		// Admin
 		AdminSteamIDs: getEnvAsStringSlice("ADMIN_STEAM_IDS", []string{}),

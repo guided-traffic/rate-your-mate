@@ -315,3 +315,84 @@ func (h *VoteHandler) GetChampions(c *gin.Context) {
 		"champions": champions,
 	})
 }
+
+// GlobalRankingResponse represents the response for GET /api/v1/ranking
+type GlobalRankingResponse struct {
+	Rankings           []repository.PlayerRanking `json:"rankings"`
+	TotalVotes         int                        `json:"total_votes"`
+	MinVotesForRanking int                        `json:"min_votes_for_ranking"`
+	RankingActive      bool                       `json:"ranking_active"`
+}
+
+// GetGlobalRanking returns the global ranking based on net votes
+// GET /api/v1/ranking
+func (h *VoteHandler) GetGlobalRanking(c *gin.Context) {
+	rankings, err := h.voteRepo.GetGlobalRanking()
+	if err != nil {
+		log.Printf("Failed to get global ranking: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to load ranking",
+		})
+		return
+	}
+
+	totalVotes, err := h.voteRepo.GetTotalVoteCount()
+	if err != nil {
+		log.Printf("Failed to get total vote count: %v", err)
+		totalVotes = 0
+	}
+
+	c.JSON(http.StatusOK, GlobalRankingResponse{
+		Rankings:           rankings,
+		TotalVotes:         totalVotes,
+		MinVotesForRanking: h.cfg.MinVotesForRanking,
+		RankingActive:      totalVotes >= h.cfg.MinVotesForRanking,
+	})
+}
+
+// GetMyRanking returns the current user's rank
+// GET /api/v1/ranking/me
+func (h *VoteHandler) GetMyRanking(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "Not authenticated",
+		})
+		return
+	}
+
+	totalVotes, err := h.voteRepo.GetTotalVoteCount()
+	if err != nil {
+		log.Printf("Failed to get total vote count: %v", err)
+		totalVotes = 0
+	}
+
+	rankingActive := totalVotes >= h.cfg.MinVotesForRanking
+
+	// If ranking is not active yet, return early
+	if !rankingActive {
+		c.JSON(http.StatusOK, gin.H{
+			"rank":               nil,
+			"total_votes":        totalVotes,
+			"min_votes_for_ranking": h.cfg.MinVotesForRanking,
+			"ranking_active":     false,
+		})
+		return
+	}
+
+	ranking, err := h.voteRepo.GetUserRank(userID)
+	if err != nil {
+		log.Printf("Failed to get user rank: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to load ranking",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"rank":               ranking,
+		"total_votes":        totalVotes,
+		"min_votes_for_ranking": h.cfg.MinVotesForRanking,
+		"ranking_active":     true,
+	})
+}

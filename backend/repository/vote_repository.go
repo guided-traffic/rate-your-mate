@@ -348,3 +348,102 @@ func (r *VoteRepository) DeleteAll() (int64, error) {
 
 	return rowsAffected, err
 }
+
+// PlayerRanking represents a user's global ranking based on net votes (positive - negative)
+type PlayerRanking struct {
+	User      models.PublicUser `json:"user"`
+	NetVotes  int               `json:"net_votes"`  // positive votes - negative votes
+	Rank      int               `json:"rank"`
+}
+
+// GlobalRankingResult contains the global ranking data
+type GlobalRankingResult struct {
+	Rankings       []PlayerRanking `json:"rankings"`
+	TotalVotes     int             `json:"total_votes"`
+	MinVotesNeeded int             `json:"min_votes_needed"`
+}
+
+// GetTotalVoteCount returns the total number of votes in the database
+func (r *VoteRepository) GetTotalVoteCount() (int, error) {
+	var count int
+	err := database.DB.QueryRow(`SELECT COUNT(*) FROM votes`).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get total vote count: %w", err)
+	}
+	return count, nil
+}
+
+// GetGlobalRanking calculates the global ranking based on net votes (positive - negative)
+// Users with the same net vote count share the same rank
+func (r *VoteRepository) GetGlobalRanking() ([]PlayerRanking, error) {
+	// Calculate net votes per user: sum of points for positive achievements minus sum of points for negative achievements
+	rows, err := database.DB.Query(`
+		SELECT
+			u.id, u.steam_id, u.username, u.avatar_url, u.avatar_small, u.profile_url,
+			COALESCE(SUM(CASE
+				WHEN v.achievement_id IN ('pro-player', 'endboss', 'teamplayer', 'mvp', 'clutch-king', 'support-hero', 'stratege', 'good-sport')
+				THEN v.points
+				ELSE 0
+			END), 0) -
+			COALESCE(SUM(CASE
+				WHEN v.achievement_id IN ('noob', 'camper', 'rage-quitter', 'toxic', 'lagger', 'afk-king', 'friendly-fire-expert')
+				THEN v.points
+				ELSE 0
+			END), 0) as net_votes
+		FROM users u
+		LEFT JOIN votes v ON v.to_user_id = u.id
+		WHERE NOT EXISTS (SELECT 1 FROM banned_users b WHERE b.steam_id = u.steam_id)
+		GROUP BY u.id
+		ORDER BY net_votes DESC, u.username ASC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get global ranking: %w", err)
+	}
+	defer rows.Close()
+
+	var rankings []PlayerRanking
+	for rows.Next() {
+		var user models.PublicUser
+		var netVotes int
+
+		err := rows.Scan(
+			&user.ID, &user.SteamID, &user.Username, &user.AvatarURL, &user.AvatarSmall, &user.ProfileURL,
+			&netVotes,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan ranking row: %w", err)
+		}
+
+		rankings = append(rankings, PlayerRanking{
+			User:     user,
+			NetVotes: netVotes,
+		})
+	}
+
+	// Assign ranks - users with the same net votes share the same rank
+	currentRank := 1
+	for i := range rankings {
+		if i > 0 && rankings[i].NetVotes < rankings[i-1].NetVotes {
+			currentRank = i + 1
+		}
+		rankings[i].Rank = currentRank
+	}
+
+	return rankings, nil
+}
+
+// GetUserRank returns the rank for a specific user
+func (r *VoteRepository) GetUserRank(userID uint64) (*PlayerRanking, error) {
+	rankings, err := r.GetGlobalRanking()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, ranking := range rankings {
+		if ranking.User.ID == userID {
+			return &ranking, nil
+		}
+	}
+
+	return nil, nil
+}

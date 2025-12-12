@@ -113,6 +113,24 @@ import { GameService } from '../../services/game.service';
                 </div>
               </div>
 
+              <div class="setting-group">
+                <label for="minVotesForRanking">Mindest-Votes für Ranking</label>
+                <p class="setting-description">
+                  Wie viele Votes insgesamt abgegeben werden müssen, bevor das Ranking angezeigt wird.
+                </p>
+                <div class="input-group">
+                  <input
+                    type="number"
+                    id="minVotesForRanking"
+                    [(ngModel)]="minVotesForRanking"
+                    min="0"
+                    max="1000"
+                    class="setting-input"
+                  />
+                  <span class="input-suffix">Votes</span>
+                </div>
+              </div>
+
               <div class="actions">
                 <button
                   (click)="saveSettings()"
@@ -1529,10 +1547,12 @@ export class AdminComponent implements OnInit, AfterViewChecked {
   // Form values
   creditIntervalMinutes = 10;
   creditMax = 10;
+  minVotesForRanking = 10;
 
   // Original values for comparison
   private originalCreditIntervalMinutes = 10;
   private originalCreditMax = 10;
+  private originalMinVotesForRanking = 10;
 
   ngAfterViewChecked(): void {
     if (this.shouldFocusPassword && this.passwordField) {
@@ -1616,10 +1636,12 @@ export class AdminComponent implements OnInit, AfterViewChecked {
       next: (settings) => {
         this.creditIntervalMinutes = settings.credit_interval_minutes;
         this.creditMax = settings.credit_max;
+        this.minVotesForRanking = settings.min_votes_for_ranking;
         this.votingPaused.set(settings.voting_paused);
         this.voteVisibilityMode.set(settings.vote_visibility_mode || 'user_choice');
         this.originalCreditIntervalMinutes = settings.credit_interval_minutes;
         this.originalCreditMax = settings.credit_max;
+        this.originalMinVotesForRanking = settings.min_votes_for_ranking;
         this.loading.set(false);
 
         // Load player management data
@@ -1639,11 +1661,13 @@ export class AdminComponent implements OnInit, AfterViewChecked {
 
     this.settingsService.updateSettings({
       credit_interval_minutes: this.creditIntervalMinutes,
-      credit_max: this.creditMax
+      credit_max: this.creditMax,
+      min_votes_for_ranking: this.minVotesForRanking
     }).subscribe({
       next: (settings) => {
         this.originalCreditIntervalMinutes = settings.credit_interval_minutes;
         this.originalCreditMax = settings.credit_max;
+        this.originalMinVotesForRanking = settings.min_votes_for_ranking;
         this.saving.set(false);
         this.notifications.success('✅ Gespeichert', 'Einstellungen wurden gespeichert und an alle Spieler übertragen');
       },
@@ -1658,11 +1682,13 @@ export class AdminComponent implements OnInit, AfterViewChecked {
   resetToOriginal(): void {
     this.creditIntervalMinutes = this.originalCreditIntervalMinutes;
     this.creditMax = this.originalCreditMax;
+    this.minVotesForRanking = this.originalMinVotesForRanking;
   }
 
   hasChanges(): boolean {
     return this.creditIntervalMinutes !== this.originalCreditIntervalMinutes ||
-           this.creditMax !== this.originalCreditMax;
+           this.creditMax !== this.originalCreditMax ||
+           this.minVotesForRanking !== this.originalMinVotesForRanking;
   }
 
   resetAllCredits(): void {

@@ -3,6 +3,7 @@ export interface Settings {
   credit_max: number;
   voting_paused: boolean;
   vote_visibility_mode: 'user_choice' | 'all_secret' | 'all_public';
+  min_votes_for_ranking: number;
 }
 
 export interface UpdateSettingsRequest {
@@ -10,6 +11,7 @@ export interface UpdateSettingsRequest {
   credit_max?: number;
   voting_paused?: boolean;
   vote_visibility_mode?: 'user_choice' | 'all_secret' | 'all_public';
+  min_votes_for_ranking?: number;
 }
 
 export interface CreditActionResponse {

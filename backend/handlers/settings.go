@@ -37,6 +37,7 @@ type GetSettingsResponse struct {
 	CreditMax             int    `json:"credit_max"`
 	VotingPaused          bool   `json:"voting_paused"`
 	VoteVisibilityMode    string `json:"vote_visibility_mode"` // "user_choice", "all_secret", "all_public"
+	MinVotesForRanking    int    `json:"min_votes_for_ranking"`
 }
 
 // UpdateSettingsRequest represents the request body for PUT /settings
@@ -45,6 +46,7 @@ type UpdateSettingsRequest struct {
 	CreditMax             *int    `json:"credit_max"`
 	VotingPaused          *bool   `json:"voting_paused"`
 	VoteVisibilityMode    *string `json:"vote_visibility_mode"` // "user_choice", "all_secret", "all_public"
+	MinVotesForRanking    *int    `json:"min_votes_for_ranking"`
 }
 
 // VotingStatusResponse represents the response for GET /voting-status
@@ -68,6 +70,7 @@ func (h *SettingsHandler) GetSettings(c *gin.Context) {
 		CreditMax:             h.cfg.CreditMax,
 		VotingPaused:          h.cfg.VotingPaused,
 		VoteVisibilityMode:    h.cfg.VoteVisibilityMode,
+		MinVotesForRanking:    h.cfg.MinVotesForRanking,
 	})
 }
 
@@ -151,6 +154,18 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 		log.Printf("Admin updated vote_visibility_mode to %s", *req.VoteVisibilityMode)
 	}
 
+	if req.MinVotesForRanking != nil {
+		if *req.MinVotesForRanking < 0 || *req.MinVotesForRanking > 1000 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "min_votes_for_ranking must be between 0 and 1000",
+			})
+			return
+		}
+		h.cfg.MinVotesForRanking = *req.MinVotesForRanking
+		updated = true
+		log.Printf("Admin updated min_votes_for_ranking to %d", *req.MinVotesForRanking)
+	}
+
 	// Broadcast settings change to all connected clients
 	if updated {
 		h.wsHub.BroadcastSettingsUpdate(&websocket.SettingsPayload{
@@ -166,6 +181,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 		CreditMax:             h.cfg.CreditMax,
 		VotingPaused:          h.cfg.VotingPaused,
 		VoteVisibilityMode:    h.cfg.VoteVisibilityMode,
+		MinVotesForRanking:    h.cfg.MinVotesForRanking,
 	})
 }
 
