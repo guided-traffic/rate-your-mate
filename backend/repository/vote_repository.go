@@ -223,106 +223,62 @@ func (r *VoteRepository) GetVotesForUser(userID uint64) ([]models.VoteWithDetail
 	return votes, nil
 }
 
-// Champion represents the king or brother of the king
+// Champion represents a top player in the ranking
 type Champion struct {
-	User             *models.PublicUser `json:"user"`
-	AchievementCount int                `json:"achievement_count"`
-	TotalVotes       int                `json:"total_votes"`
+	User       *models.PublicUser `json:"user"`
+	TotalScore int                `json:"total_score"`  // Net votes + bonus points
+	NetVotes   int                `json:"net_votes"`    // Positive - negative votes
+	BonusPoints int               `json:"bonus_points"` // Bonus from achievement placements
+	Rank       int                `json:"rank"`
 }
 
-// ChampionsResult contains both the king and the brother
+// ChampionsResult contains the top 3 players
 type ChampionsResult struct {
-	King    *Champion `json:"king"`
-	Brother *Champion `json:"brother"`
+	King   *Champion `json:"king"`   // 1st place
+	Second *Champion `json:"second"` // 2nd place
+	Third  *Champion `json:"third"`  // 3rd place
 }
 
-// GetChampions calculates the King (winner) and Brother of the King (loser)
-// Winner: Most unique positive achievements, then most positive votes, then most total votes
-// Loser: Most unique negative achievements, then most negative votes, then most total votes (excluding winner)
+// GetChampions calculates the top 3 players based on:
+// 1. Net votes (positive - negative)
+// 2. Bonus points from holding top 3 positions in positive achievements (1st: +5, 2nd: +3, 3rd: +2)
+// Tie-breaking for achievement positions: first vote wins (earlier created_at)
 func (r *VoteRepository) GetChampions() (*ChampionsResult, error) {
 	result := &ChampionsResult{}
 
-	// Get all positive achievements data per user
-	// Count: unique achievements, sum of points on those achievements
-	positiveRows, err := database.DB.Query(`
-		SELECT
-			u.id, u.steam_id, u.username, u.avatar_url, u.avatar_small, u.profile_url,
-			COUNT(DISTINCT v.achievement_id) as achievement_count,
-			SUM(v.points) as total_votes
-		FROM votes v
-		JOIN users u ON v.to_user_id = u.id
-		WHERE v.achievement_id IN ('pro-player', 'endboss', 'teamplayer', 'mvp', 'clutch-king', 'support-hero', 'stratege', 'good-sport')
-		GROUP BY u.id
-		ORDER BY achievement_count DESC, total_votes DESC
-	`)
+	// Get global rankings (already includes bonus points)
+	rankings, err := r.GetGlobalRanking()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get positive champions: %w", err)
+		return nil, err
 	}
-	defer positiveRows.Close()
 
-	// Find the king (first row with tiebreaker on total votes)
-	var kingUserID uint64
-	for positiveRows.Next() {
-		var user models.PublicUser
-		var achievementCount, totalVotes int
-
-		err := positiveRows.Scan(
-			&user.ID, &user.SteamID, &user.Username, &user.AvatarURL, &user.AvatarSmall, &user.ProfileURL,
-			&achievementCount, &totalVotes,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan positive champion row: %w", err)
-		}
-
-		if result.King == nil {
-			result.King = &Champion{
-				User:             &user,
-				AchievementCount: achievementCount,
-				TotalVotes:       totalVotes,
-			}
-			kingUserID = user.ID
+	// Build result with top 3
+	for i, p := range rankings {
+		if i >= 3 {
 			break
 		}
-	}
-
-	// Get all negative achievements data per user (excluding the king)
-	negativeRows, err := database.DB.Query(`
-		SELECT
-			u.id, u.steam_id, u.username, u.avatar_url, u.avatar_small, u.profile_url,
-			COUNT(DISTINCT v.achievement_id) as achievement_count,
-			SUM(v.points) as total_votes
-		FROM votes v
-		JOIN users u ON v.to_user_id = u.id
-		WHERE v.achievement_id IN ('noob', 'camper', 'rage-quitter', 'toxic', 'lagger', 'afk-king', 'friendly-fire-expert')
-		AND u.id != ?
-		GROUP BY u.id
-		ORDER BY achievement_count DESC, total_votes DESC
-	`, kingUserID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get negative champions: %w", err)
-	}
-	defer negativeRows.Close()
-
-	// Find the brother (first row)
-	for negativeRows.Next() {
-		var user models.PublicUser
-		var achievementCount, totalVotes int
-
-		err := negativeRows.Scan(
-			&user.ID, &user.SteamID, &user.Username, &user.AvatarURL, &user.AvatarSmall, &user.ProfileURL,
-			&achievementCount, &totalVotes,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan negative champion row: %w", err)
+		champion := &Champion{
+			User: &models.PublicUser{
+				ID:          p.User.ID,
+				SteamID:     p.User.SteamID,
+				Username:    p.User.Username,
+				AvatarURL:   p.User.AvatarURL,
+				AvatarSmall: p.User.AvatarSmall,
+				ProfileURL:  p.User.ProfileURL,
+			},
+			TotalScore:  p.TotalScore,
+			NetVotes:    p.NetVotes,
+			BonusPoints: p.BonusPoints,
+			Rank:        p.Rank,
 		}
 
-		if result.Brother == nil {
-			result.Brother = &Champion{
-				User:             &user,
-				AchievementCount: achievementCount,
-				TotalVotes:       totalVotes,
-			}
-			break
+		switch i {
+		case 0:
+			result.King = champion
+		case 1:
+			result.Second = champion
+		case 2:
+			result.Third = champion
 		}
 	}
 
@@ -349,11 +305,13 @@ func (r *VoteRepository) DeleteAll() (int64, error) {
 	return rowsAffected, err
 }
 
-// PlayerRanking represents a user's global ranking based on net votes (positive - negative)
+// PlayerRanking represents a user's global ranking based on total score (net votes + bonus points)
 type PlayerRanking struct {
-	User      models.PublicUser `json:"user"`
-	NetVotes  int               `json:"net_votes"`  // positive votes - negative votes
-	Rank      int               `json:"rank"`
+	User        models.PublicUser `json:"user"`
+	TotalScore  int               `json:"total_score"`  // net votes + bonus points
+	NetVotes    int               `json:"net_votes"`    // positive votes - negative votes
+	BonusPoints int               `json:"bonus_points"` // bonus from achievement placements
+	Rank        int               `json:"rank"`
 }
 
 // GlobalRankingResult contains the global ranking data
@@ -373,20 +331,80 @@ func (r *VoteRepository) GetTotalVoteCount() (int, error) {
 	return count, nil
 }
 
-// GetGlobalRanking calculates the global ranking based on net votes (positive - negative)
-// Users with the same net vote count share the same rank
+// getAchievementBonusPoints calculates bonus points for each user based on their achievement positions
+// Only positive achievements count for bonus: 1st place = 5, 2nd = 3, 3rd = 2 points
+func (r *VoteRepository) getAchievementBonusPoints() (map[uint64]int, error) {
+	rows, err := database.DB.Query(`
+		SELECT
+			v.achievement_id,
+			v.to_user_id,
+			SUM(v.points) as vote_count,
+			MIN(v.created_at) as first_vote
+		FROM votes v
+		WHERE v.achievement_id IN ('pro-player', 'teamplayer', 'clutch-king', 'support-hero', 'stratege', 'good-sport')
+		GROUP BY v.achievement_id, v.to_user_id
+		ORDER BY v.achievement_id, vote_count DESC, first_vote ASC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get achievement rankings: %w", err)
+	}
+	defer rows.Close()
+
+	bonusPoints := make(map[uint64]int)
+	currentAchievement := ""
+	positionInAchievement := 0
+
+	for rows.Next() {
+		var achievementID string
+		var userID uint64
+		var voteCount int
+		var firstVote interface{}
+
+		err := rows.Scan(&achievementID, &userID, &voteCount, &firstVote)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan achievement ranking row: %w", err)
+		}
+
+		if achievementID != currentAchievement {
+			currentAchievement = achievementID
+			positionInAchievement = 0
+		}
+
+		positionInAchievement++
+
+		switch positionInAchievement {
+		case 1:
+			bonusPoints[userID] += 5
+		case 2:
+			bonusPoints[userID] += 3
+		case 3:
+			bonusPoints[userID] += 2
+		}
+	}
+
+	return bonusPoints, nil
+}
+
+// GetGlobalRanking calculates the global ranking based on total score (net votes + bonus points)
+// Users with the same total score share the same rank
 func (r *VoteRepository) GetGlobalRanking() ([]PlayerRanking, error) {
-	// Calculate net votes per user: sum of points for positive achievements minus sum of points for negative achievements
+	// Step 1: Get bonus points from achievement positions
+	bonusPoints, err := r.getAchievementBonusPoints()
+	if err != nil {
+		return nil, err
+	}
+
+	// Step 2: Calculate net votes per user
 	rows, err := database.DB.Query(`
 		SELECT
 			u.id, u.steam_id, u.username, u.avatar_url, u.avatar_small, u.profile_url,
 			COALESCE(SUM(CASE
-				WHEN v.achievement_id IN ('pro-player', 'endboss', 'teamplayer', 'mvp', 'clutch-king', 'support-hero', 'stratege', 'good-sport')
+				WHEN v.achievement_id IN ('pro-player', 'teamplayer', 'clutch-king', 'support-hero', 'stratege', 'good-sport')
 				THEN v.points
 				ELSE 0
 			END), 0) -
 			COALESCE(SUM(CASE
-				WHEN v.achievement_id IN ('noob', 'camper', 'rage-quitter', 'toxic', 'lagger', 'afk-king', 'friendly-fire-expert')
+				WHEN v.achievement_id IN ('rage-quitter', 'toxic', 'friendly-fire-expert')
 				THEN v.points
 				ELSE 0
 			END), 0) as net_votes
@@ -394,7 +412,6 @@ func (r *VoteRepository) GetGlobalRanking() ([]PlayerRanking, error) {
 		LEFT JOIN votes v ON v.to_user_id = u.id
 		WHERE NOT EXISTS (SELECT 1 FROM banned_users b WHERE b.steam_id = u.steam_id)
 		GROUP BY u.id
-		ORDER BY net_votes DESC, u.username ASC
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get global ranking: %w", err)
@@ -414,16 +431,29 @@ func (r *VoteRepository) GetGlobalRanking() ([]PlayerRanking, error) {
 			return nil, fmt.Errorf("failed to scan ranking row: %w", err)
 		}
 
+		bonus := bonusPoints[user.ID]
 		rankings = append(rankings, PlayerRanking{
-			User:     user,
-			NetVotes: netVotes,
+			User:        user,
+			TotalScore:  netVotes + bonus,
+			NetVotes:    netVotes,
+			BonusPoints: bonus,
 		})
 	}
 
-	// Assign ranks - users with the same net votes share the same rank
+	// Sort by total score descending, then by username
+	for i := 0; i < len(rankings); i++ {
+		for j := i + 1; j < len(rankings); j++ {
+			if rankings[j].TotalScore > rankings[i].TotalScore ||
+				(rankings[j].TotalScore == rankings[i].TotalScore && rankings[j].User.Username < rankings[i].User.Username) {
+				rankings[i], rankings[j] = rankings[j], rankings[i]
+			}
+		}
+	}
+
+	// Assign ranks - users with the same total score share the same rank
 	currentRank := 1
 	for i := range rankings {
-		if i > 0 && rankings[i].NetVotes < rankings[i-1].NetVotes {
+		if i > 0 && rankings[i].TotalScore < rankings[i-1].TotalScore {
 			currentRank = i + 1
 		}
 		rankings[i].Rank = currentRank

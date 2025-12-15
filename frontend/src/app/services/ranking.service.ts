@@ -5,7 +5,9 @@ import { User } from '../models/user.model';
 
 export interface PlayerRanking {
   user: User;
-  net_votes: number;
+  total_score: number;   // net votes + bonus points
+  net_votes: number;     // positive - negative votes
+  bonus_points: number;  // bonus from achievement placements
   rank: number;
 }
 

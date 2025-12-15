@@ -50,7 +50,7 @@ PLAYERS=(
 
 # Achievements (positive und negative)
 POSITIVE_ACHIEVEMENTS=("pro-player" "teamplayer" "clutch-king" "support-hero" "stratege" "good-sport")
-NEGATIVE_ACHIEVEMENTS=("noob" "camper" "rage-quitter" "toxic" "afk-king" "friendly-fire-expert")
+NEGATIVE_ACHIEVEMENTS=("rage-quitter" "toxic" "friendly-fire-expert")
 
 echo "🧹 Lösche bestehende Fake-Daten..."
 # Nur FAKE_ User und deren Votes löschen

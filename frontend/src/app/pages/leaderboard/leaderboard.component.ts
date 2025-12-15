@@ -21,14 +21,14 @@ import { AchievementLeaderboard, ChampionsResult } from '../../models/vote.model
       } @else {
         <!-- Champions Section -->
         <section class="champions-section">
-          <div class="champions-grid">
-            <!-- König (Winner) -->
+          <!-- König (1. Platz) -->
+          <div class="king-wrapper">
             <div class="champion-card king">
               <div class="champion-image-wrapper">
                 <img src="/logos/king.webp" alt="König" class="champion-image" />
               </div>
-              <h2 class="champion-title">👑 König</h2>
-              <p class="champion-subtitle">Der Gewinner der LAN-Party</p>
+              <h2 class="champion-title">👑 König der LAN-Party</h2>
+              <p class="champion-subtitle">1. Platz</p>
               @if (champions()?.king) {
                 <div class="champion-holder">
                   <img
@@ -38,9 +38,46 @@ import { AchievementLeaderboard, ChampionsResult } from '../../models/vote.model
                   />
                   <span class="champion-name">{{ champions()!.king!.user.username }}</span>
                   <div class="champion-stats">
-                    <span class="stat">{{ champions()!.king!.achievement_count }} Achievements</span>
-                    <span class="stat-separator">•</span>
-                    <span class="stat">{{ champions()!.king!.total_votes }} Votes</span>
+                    <span class="stat total-score">{{ champions()!.king!.total_score }} Punkte</span>
+                  </div>
+                  <div class="champion-stats-detail">
+                    <span class="stat-detail">{{ champions()!.king!.net_votes }} Votes</span>
+                    @if (champions()!.king!.bonus_points > 0) {
+                      <span class="stat-separator">+</span>
+                      <span class="stat-detail bonus">{{ champions()!.king!.bonus_points }} Bonus</span>
+                    }
+                  </div>
+                </div>
+              } @else {
+                <div class="no-champion">
+                  <span>Noch nicht ermittelt</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- 2. und 3. Platz -->
+          <div class="runners-up-grid">
+            <!-- 2. Platz -->
+            <div class="champion-card runner-up second">
+              <h2 class="champion-title">🥈 2. Platz</h2>
+              @if (champions()?.second) {
+                <div class="champion-holder">
+                  <img
+                    [src]="champions()!.second!.user.avatar_url || '/assets/default-avatar.png'"
+                    [alt]="champions()!.second!.user.username"
+                    class="champion-avatar"
+                  />
+                  <span class="champion-name">{{ champions()!.second!.user.username }}</span>
+                  <div class="champion-stats">
+                    <span class="stat total-score">{{ champions()!.second!.total_score }} Punkte</span>
+                  </div>
+                  <div class="champion-stats-detail">
+                    <span class="stat-detail">{{ champions()!.second!.net_votes }} Votes</span>
+                    @if (champions()!.second!.bonus_points > 0) {
+                      <span class="stat-separator">+</span>
+                      <span class="stat-detail bonus">{{ champions()!.second!.bonus_points }} Bonus</span>
+                    }
                   </div>
                 </div>
               } @else {
@@ -50,25 +87,26 @@ import { AchievementLeaderboard, ChampionsResult } from '../../models/vote.model
               }
             </div>
 
-            <!-- Bruder vom König (Loser) -->
-            <div class="champion-card brother">
-              <div class="champion-image-wrapper">
-                <img src="/logos/brother.webp" alt="Bruder vom König" class="champion-image" />
-              </div>
-              <h2 class="champion-title">🤡 Bruder vom König</h2>
-              <p class="champion-subtitle">Der Verlierer der LAN-Party</p>
-              @if (champions()?.brother) {
+            <!-- 3. Platz -->
+            <div class="champion-card runner-up third">
+              <h2 class="champion-title">🥉 3. Platz</h2>
+              @if (champions()?.third) {
                 <div class="champion-holder">
                   <img
-                    [src]="champions()!.brother!.user.avatar_url || '/assets/default-avatar.png'"
-                    [alt]="champions()!.brother!.user.username"
+                    [src]="champions()!.third!.user.avatar_url || '/assets/default-avatar.png'"
+                    [alt]="champions()!.third!.user.username"
                     class="champion-avatar"
                   />
-                  <span class="champion-name">{{ champions()!.brother!.user.username }}</span>
+                  <span class="champion-name">{{ champions()!.third!.user.username }}</span>
                   <div class="champion-stats">
-                    <span class="stat">{{ champions()!.brother!.achievement_count }} Achievements</span>
-                    <span class="stat-separator">•</span>
-                    <span class="stat">{{ champions()!.brother!.total_votes }} Votes</span>
+                    <span class="stat total-score">{{ champions()!.third!.total_score }} Punkte</span>
+                  </div>
+                  <div class="champion-stats-detail">
+                    <span class="stat-detail">{{ champions()!.third!.net_votes }} Votes</span>
+                    @if (champions()!.third!.bonus_points > 0) {
+                      <span class="stat-separator">+</span>
+                      <span class="stat-detail bonus">{{ champions()!.third!.bonus_points }} Bonus</span>
+                    }
                   </div>
                 </div>
               } @else {
@@ -358,11 +396,17 @@ import { AchievementLeaderboard, ChampionsResult } from '../../models/vote.model
       margin-bottom: 48px;
     }
 
-    .champions-grid {
+    .king-wrapper {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+
+    .runners-up-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 24px;
-      max-width: 800px;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      max-width: 600px;
       margin: 0 auto;
     }
 
@@ -376,19 +420,83 @@ import { AchievementLeaderboard, ChampionsResult } from '../../models/vote.model
 
       &.king {
         border-color: rgba(255, 215, 0, 0.5);
-        background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, $bg-card 100%);
+        background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, $bg-card 100%);
+        max-width: 400px;
 
         .champion-title {
+          color: #ffd700;
+          font-size: 28px;
+        }
+
+        .champion-avatar {
+          width: 80px;
+          height: 80px;
+          border-color: #ffd700;
+        }
+
+        .champion-name {
+          font-size: 22px;
+        }
+
+        .total-score {
+          font-size: 18px;
           color: #ffd700;
         }
       }
 
-      &.brother {
-        border-color: rgba(139, 69, 19, 0.5);
-        background: linear-gradient(135deg, rgba(139, 69, 19, 0.1) 0%, $bg-card 100%);
+      &.runner-up {
+        padding: 20px;
 
         .champion-title {
-          color: #cd853f;
+          font-size: 18px;
+          margin-bottom: 12px;
+        }
+
+        .champion-avatar {
+          width: 56px;
+          height: 56px;
+        }
+
+        .champion-name {
+          font-size: 16px;
+        }
+
+        .champion-holder {
+          padding: 12px;
+        }
+      }
+
+      &.second {
+        border-color: rgba(192, 192, 192, 0.5);
+        background: linear-gradient(135deg, rgba(192, 192, 192, 0.1) 0%, $bg-card 100%);
+
+        .champion-title {
+          color: #c0c0c0;
+        }
+
+        .champion-avatar {
+          border-color: #c0c0c0;
+        }
+
+        .total-score {
+          color: #c0c0c0;
+        }
+      }
+
+      &.third {
+        border-color: rgba(205, 127, 50, 0.5);
+        background: linear-gradient(135deg, rgba(205, 127, 50, 0.1) 0%, $bg-card 100%);
+
+        .champion-title {
+          color: #cd7f32;
+        }
+
+        .champion-avatar {
+          border-color: #cd7f32;
+        }
+
+        .total-score {
+          color: #cd7f32;
         }
       }
     }
@@ -433,14 +541,6 @@ import { AchievementLeaderboard, ChampionsResult } from '../../models/vote.model
       border: 3px solid $border-color;
     }
 
-    .king .champion-avatar {
-      border-color: #ffd700;
-    }
-
-    .brother .champion-avatar {
-      border-color: #cd853f;
-    }
-
     .champion-name {
       font-size: 18px;
       font-weight: 600;
@@ -450,8 +550,26 @@ import { AchievementLeaderboard, ChampionsResult } from '../../models/vote.model
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 13px;
+      font-size: 15px;
+      font-weight: 600;
+
+      .total-score {
+        font-weight: 700;
+      }
+    }
+
+    .champion-stats-detail {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
       color: $text-muted;
+
+      .stat-detail {
+        &.bonus {
+          color: $accent-positive;
+        }
+      }
     }
 
     .stat-separator {

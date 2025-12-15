@@ -124,10 +124,10 @@ import { Subscription, interval } from 'rxjs';
                       @for (player of sortedPlayers(); track player.user.id; let i = $index) {
                         <div
                           class="player-marker"
-                          [style.left.%]="getPlayerPosition(player.net_votes)"
+                          [style.left.%]="getPlayerPosition(player.total_score)"
                           [style.top.%]="getPlayerYPosition(i)"
-                          [style.z-index]="getZIndex(player.net_votes)"
-                          [title]="player.user.username + ': ' + player.net_votes + ' Punkte'"
+                          [style.z-index]="getZIndex(player.total_score)"
+                          [title]="player.user.username + ': ' + player.total_score + ' Punkte'"
                         >
                           <img
                             [src]="player.user.avatar_small || player.user.avatar_url || '/assets/default-avatar.png'"
@@ -666,10 +666,10 @@ export class HeaderComponent implements OnInit, OnDestroy {
   private axisMin = computed(() => {
     const players = this.allPlayers();
     if (players.length === 0) return 0;
-    const minVotes = Math.min(...players.map(p => p.net_votes));
+    const minScore = Math.min(...players.map(p => p.total_score));
     // If someone is negative, extend axis to include them (rounded down to nearest 5)
-    if (minVotes < 0) {
-      return Math.floor(minVotes / 5) * 5;
+    if (minScore < 0) {
+      return Math.floor(minScore / 5) * 5;
     }
     return 0;
   });
@@ -677,10 +677,10 @@ export class HeaderComponent implements OnInit, OnDestroy {
   private axisMax = computed(() => {
     const players = this.allPlayers();
     if (players.length === 0) return 10;
-    const maxVotes = Math.max(...players.map(p => p.net_votes), 0);
+    const maxScore = Math.max(...players.map(p => p.total_score), 0);
     // Start at 10, then increase in 5er steps if someone exceeds
-    if (maxVotes >= 10) {
-      return Math.ceil(maxVotes / 5) * 5;
+    if (maxScore >= 10) {
+      return Math.ceil(maxScore / 5) * 5;
     }
     return 10;
   });

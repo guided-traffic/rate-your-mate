@@ -37,11 +37,14 @@ export interface AchievementLeaderboard {
 
 export interface Champion {
   user: User;
-  achievement_count: number;
-  total_votes: number;
+  total_score: number;   // Net votes + bonus points
+  net_votes: number;     // Positive - negative votes
+  bonus_points: number;  // Bonus from achievement placements
+  rank: number;
 }
 
 export interface ChampionsResult {
-  king: Champion | null;
-  brother: Champion | null;
+  king: Champion | null;   // 1st place
+  second: Champion | null; // 2nd place
+  third: Champion | null;  // 3rd place
 }
