@@ -202,6 +202,26 @@ import { Achievement } from '../../models/achievement.model';
               </span>
             </div>
 
+            <div class="comment-section">
+              <label class="comment-label" for="vote-comment">
+                Kommentar <span class="optional-hint">(optional)</span>
+              </label>
+              <div class="comment-input-wrapper">
+                <textarea
+                  id="vote-comment"
+                  class="comment-input"
+                  [ngModel]="voteComment()"
+                  (ngModelChange)="voteComment.set($event)"
+                  placeholder="Füge einen kurzen Kommentar hinzu..."
+                  maxlength="160"
+                  rows="2"
+                ></textarea>
+                <span class="char-counter" [class.limit]="voteComment().length >= 150">
+                  {{ voteComment().length }}/160
+                </span>
+              </div>
+            </div>
+
             <button
               class="btn btn-primary btn-lg"
               [disabled]="submitting() || auth.credits() < selectedPoints() || votingPaused()"
@@ -627,6 +647,67 @@ import { Achievement } from '../../models/achievement.model';
         text-align: center;
       }
     }
+
+    .comment-section {
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      .comment-label {
+        font-weight: 600;
+        font-size: 14px;
+        color: $text-secondary;
+
+        .optional-hint {
+          font-weight: 400;
+          color: $text-muted;
+          font-size: 12px;
+        }
+      }
+
+      .comment-input-wrapper {
+        position: relative;
+      }
+
+      .comment-input {
+        width: 100%;
+        padding: 12px 14px;
+        padding-bottom: 28px;
+        background: $bg-tertiary;
+        border: 1px solid $border-color;
+        border-radius: $radius-md;
+        color: $text-primary;
+        font-size: 14px;
+        font-family: inherit;
+        resize: none;
+        transition: all $transition-fast;
+
+        &::placeholder {
+          color: $text-muted;
+        }
+
+        &:focus {
+          outline: none;
+          border-color: $accent-primary;
+          box-shadow: 0 0 0 3px rgba($accent-primary, 0.1);
+        }
+      }
+
+      .char-counter {
+        position: absolute;
+        bottom: 8px;
+        right: 12px;
+        font-size: 11px;
+        color: $text-muted;
+        pointer-events: none;
+
+        &.limit {
+          color: $accent-negative;
+        }
+      }
+    }
   `]
 })
 export class RateComponent implements OnInit {
@@ -652,6 +733,7 @@ export class RateComponent implements OnInit {
   selectedAchievement = signal<Achievement | null>(null);
   selectedPoints = signal(1);
   isSecretVote = signal(false); // Will be set based on achievement type
+  voteComment = signal(''); // Optional comment for the vote
 
   ngOnInit(): void {
     this.loadUsers();
@@ -705,6 +787,7 @@ export class RateComponent implements OnInit {
     const achievement = this.selectedAchievement();
     const points = this.selectedPoints();
     const isSecret = this.isSecretVote();
+    const comment = this.voteComment().trim() || undefined;
 
     if (!user || !achievement) return;
 
@@ -714,7 +797,8 @@ export class RateComponent implements OnInit {
       to_user_id: user.id,
       achievement_id: achievement.id,
       points: points,
-      is_secret: isSecret
+      is_secret: isSecret,
+      comment: comment
     }).subscribe({
       next: (response) => {
         this.soundService.playReviewGiven();
@@ -729,6 +813,7 @@ export class RateComponent implements OnInit {
         this.selectedAchievement.set(null);
         this.selectedPoints.set(1);
         this.isSecretVote.set(false);
+        this.voteComment.set('');
         this.submitting.set(false);
       },
       error: (error) => {

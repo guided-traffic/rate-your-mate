@@ -38,6 +38,8 @@ const (
 	MessageTypeUserKicked MessageType = "user_kicked"
 	// MessageTypeUserBanned is sent when a user is banned
 	MessageTypeUserBanned MessageType = "user_banned"
+	// MessageTypeVoteInvalidation is sent when a vote's invalidation status changes
+	MessageTypeVoteInvalidation MessageType = "vote_invalidation"
 	// MessageTypeError is sent when an error occurs
 	MessageTypeError MessageType = "error"
 )
@@ -238,6 +240,26 @@ func (h *Hub) IsUserConnected(userID uint64) bool {
 	defer h.mutex.RUnlock()
 	_, ok := h.clients[userID]
 	return ok
+}
+
+// BroadcastVoteInvalidation sends vote invalidation update to all clients
+func (h *Hub) BroadcastVoteInvalidation(voteID uint64, isInvalidated bool) {
+	msg := Message{
+		Type: MessageTypeVoteInvalidation,
+		Payload: map[string]interface{}{
+			"vote_id":        voteID,
+			"is_invalidated": isInvalidated,
+		},
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		log.Printf("WebSocket: Failed to marshal vote invalidation message: %v", err)
+		return
+	}
+
+	h.broadcast <- data
+	log.Printf("WebSocket: Broadcasted vote invalidation (vote %d, invalidated: %v) to all clients", voteID, isInvalidated)
 }
 
 // BroadcastSettingsUpdate sends settings update to all connected clients

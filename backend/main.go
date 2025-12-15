@@ -198,6 +198,8 @@ func main() {
 				admin.POST("/credits/give", settingsHandler.GiveEveryoneCredit)
 				admin.POST("/votes/delete-all", settingsHandler.DeleteAllVotes)
 				admin.POST("/games/invalidate-cache", gameHandler.InvalidateDBCache)
+				// Vote management
+				admin.PUT("/votes/:id/invalidate", voteHandler.ToggleInvalidation)
 				// User management
 				admin.GET("/users", settingsHandler.GetAllUsersForAdmin)
 				admin.GET("/users/banned", settingsHandler.GetAllBannedUsers)

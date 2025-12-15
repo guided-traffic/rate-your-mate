@@ -1,7 +1,9 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { VoteService } from '../../services/vote.service';
+import { WebSocketService } from '../../services/websocket.service';
 import { AchievementLeaderboard, ChampionsResult } from '../../models/vote.model';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-leaderboard',
@@ -583,16 +585,40 @@ import { AchievementLeaderboard, ChampionsResult } from '../../models/vote.model
     }
   `]
 })
-export class LeaderboardComponent implements OnInit {
+export class LeaderboardComponent implements OnInit, OnDestroy {
   private voteService = inject(VoteService);
+  private wsService = inject(WebSocketService);
 
   positiveAchievements = signal<AchievementLeaderboard[]>([]);
   negativeAchievements = signal<AchievementLeaderboard[]>([]);
   champions = signal<ChampionsResult | null>(null);
   loading = signal(true);
 
+  private newVoteSubscription?: Subscription;
+  private voteInvalidationSubscription?: Subscription;
+
   ngOnInit(): void {
     this.loadData();
+    this.subscribeToVoteUpdates();
+  }
+
+  ngOnDestroy(): void {
+    this.newVoteSubscription?.unsubscribe();
+    this.voteInvalidationSubscription?.unsubscribe();
+  }
+
+  private subscribeToVoteUpdates(): void {
+    // Reload data when a new vote is created
+    this.newVoteSubscription = this.wsService.newVote$.subscribe(() => {
+      console.log('Leaderboard: New vote received, reloading data');
+      this.loadData();
+    });
+
+    // Reload data when a vote is invalidated/revalidated
+    this.voteInvalidationSubscription = this.wsService.voteInvalidation$.subscribe(() => {
+      console.log('Leaderboard: Vote invalidation changed, reloading data');
+      this.loadData();
+    });
   }
 
   loadData(): void {

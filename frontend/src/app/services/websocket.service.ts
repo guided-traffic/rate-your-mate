@@ -2,7 +2,7 @@ import { Injectable, signal, inject } from '@angular/core';
 import { environment } from '../../environments/environment';
 import { AuthService } from './auth.service';
 import { ConnectionStatusService } from './connection-status.service';
-import { WebSocketMessage, VotePayload, SettingsPayload, CreditActionPayload, ChatMessagePayload, NewKingPayload, GamesSyncProgressPayload, GamesSyncCompletePayload } from '../models/websocket.model';
+import { WebSocketMessage, VotePayload, SettingsPayload, CreditActionPayload, ChatMessagePayload, NewKingPayload, GamesSyncProgressPayload, GamesSyncCompletePayload, VoteInvalidationPayload } from '../models/websocket.model';
 import { Subject, Observable } from 'rxjs';
 
 @Injectable({
@@ -28,6 +28,7 @@ export class WebSocketService {
   readonly newKing$ = new Subject<NewKingPayload>();
   readonly gamesSyncProgress$ = new Subject<GamesSyncProgressPayload>();
   readonly gamesSyncComplete$ = new Subject<GamesSyncCompletePayload>();
+  readonly voteInvalidation$ = new Subject<VoteInvalidationPayload>();
 
   // General messages observable for timeline component
   private messagesSubject = new Subject<{ type: string; payload: VotePayload }>();
@@ -109,7 +110,7 @@ export class WebSocketService {
     }
   }
 
-  private handleMessage(message: WebSocketMessage<VotePayload | SettingsPayload | CreditActionPayload | ChatMessagePayload | NewKingPayload | GamesSyncProgressPayload | GamesSyncCompletePayload>): void {
+  private handleMessage(message: WebSocketMessage<VotePayload | SettingsPayload | CreditActionPayload | ChatMessagePayload | NewKingPayload | GamesSyncProgressPayload | GamesSyncCompletePayload | VoteInvalidationPayload>): void {
     switch (message.type) {
       case 'new_vote':
         console.log('WebSocket: New vote received', message.payload);
@@ -143,6 +144,10 @@ export class WebSocketService {
       case 'games_sync_complete':
         console.log('WebSocket: Games sync complete received', message.payload);
         this.gamesSyncComplete$.next(message.payload as GamesSyncCompletePayload);
+        break;
+      case 'vote_invalidation':
+        console.log('WebSocket: Vote invalidation received', message.payload);
+        this.voteInvalidation$.next(message.payload as VoteInvalidationPayload);
         break;
       default:
         console.log('WebSocket: Unknown message type', message.type);

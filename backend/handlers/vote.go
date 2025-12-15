@@ -3,6 +3,7 @@ package handlers
 import (
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/guided-traffic/rate-your-mate/backend/config"
@@ -163,6 +164,18 @@ func (h *VoteHandler) Create(c *gin.Context) {
 		isSecret = *req.IsSecret
 	}
 
+	// Validate comment length (max 160 characters)
+	var comment *string
+	if req.Comment != nil && len(*req.Comment) > 0 {
+		if len(*req.Comment) > 160 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Comment must be at most 160 characters",
+			})
+			return
+		}
+		comment = req.Comment
+	}
+
 	// Create a single vote with points value
 	vote := &models.Vote{
 		FromUserID:    fromUserID,
@@ -170,6 +183,7 @@ func (h *VoteHandler) Create(c *gin.Context) {
 		AchievementID: req.AchievementID,
 		Points:        points,
 		IsSecret:      isSecret,
+		Comment:       comment,
 	}
 
 	if err := h.voteRepo.Create(vote); err != nil {
@@ -394,5 +408,71 @@ func (h *VoteHandler) GetMyRanking(c *gin.Context) {
 		"total_votes":        totalVotes,
 		"min_votes_for_ranking": h.cfg.MinVotesForRanking,
 		"ranking_active":     true,
+	})
+}
+
+// ToggleInvalidation toggles the is_invalidated flag of a vote (admin only)
+// PUT /api/v1/votes/:id/invalidate
+func (h *VoteHandler) ToggleInvalidation(c *gin.Context) {
+	// Get the vote ID from URL parameter
+	voteIDStr := c.Param("id")
+	voteID, err := strconv.ParseUint(voteIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid vote ID",
+		})
+		return
+	}
+
+	// Check if user is admin
+	claims, ok := middleware.GetClaims(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "Not authenticated",
+		})
+		return
+	}
+
+	if !h.cfg.IsAdmin(claims.SteamID) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "Admin access required",
+		})
+		return
+	}
+
+	// Check if vote exists
+	vote, err := h.voteRepo.GetByID(voteID)
+	if err != nil {
+		log.Printf("Failed to get vote: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to get vote",
+		})
+		return
+	}
+	if vote == nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Vote not found",
+		})
+		return
+	}
+
+	// Toggle invalidation
+	newState, err := h.voteRepo.ToggleInvalidation(voteID)
+	if err != nil {
+		log.Printf("Failed to toggle vote invalidation: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to toggle invalidation",
+		})
+		return
+	}
+
+	// Broadcast vote invalidation update via WebSocket
+	if h.wsHub != nil {
+		h.wsHub.BroadcastVoteInvalidation(voteID, newState)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"vote_id":        voteID,
+		"is_invalidated": newState,
 	})
 }

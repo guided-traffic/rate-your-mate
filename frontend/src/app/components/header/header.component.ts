@@ -664,6 +664,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
   private creditsGivenSubscription?: Subscription;
   private newKingSubscription?: Subscription;
   private timerSubscription?: Subscription;
+  private voteInvalidationSubscription?: Subscription;
   private timerInitialized = false;
 
   @ViewChild('userMenu') userMenuRef!: ElementRef;
@@ -812,6 +813,20 @@ export class HeaderComponent implements OnInit, OnDestroy {
       }
       // Refresh ranking on any new vote
       this.rankingService.refresh();
+      // Reload overlay data if visible
+      if (this.rankingOverlayVisible()) {
+        this.loadRankingData();
+      }
+    });
+
+    // Listen for vote invalidation updates
+    this.voteInvalidationSubscription = this.ws.voteInvalidation$.subscribe(() => {
+      console.log('Vote invalidation changed, refreshing ranking');
+      this.rankingService.refresh();
+      // Reload overlay data if visible
+      if (this.rankingOverlayVisible()) {
+        this.loadRankingData();
+      }
     });
 
     // Listen for settings updates from admin
@@ -869,6 +884,7 @@ export class HeaderComponent implements OnInit, OnDestroy {
     this.creditsGivenSubscription?.unsubscribe();
     this.newKingSubscription?.unsubscribe();
     this.timerSubscription?.unsubscribe();
+    this.voteInvalidationSubscription?.unsubscribe();
   }
 
   private initCreditTimer(): void {

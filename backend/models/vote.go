@@ -10,6 +10,8 @@ type Vote struct {
 	AchievementID string    `json:"achievement_id"`
 	Points        int       `json:"points"`
 	IsSecret      bool      `json:"is_secret"`
+	IsInvalidated bool      `json:"is_invalidated"`
+	Comment       *string   `json:"comment,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 }
 
@@ -22,15 +24,18 @@ type VoteWithDetails struct {
 	Achievement   Achievement `json:"achievement"`
 	Points        int         `json:"points"`
 	IsSecret      bool        `json:"is_secret"`
+	IsInvalidated bool        `json:"is_invalidated"`
+	Comment       *string     `json:"comment,omitempty"`
 	CreatedAt     time.Time   `json:"created_at"`
 }
 
 // CreateVoteRequest is the request body for creating a vote
 type CreateVoteRequest struct {
-	ToUserID      uint64 `json:"to_user_id" binding:"required"`
-	AchievementID string `json:"achievement_id" binding:"required"`
-	Points        int    `json:"points"`    // 1-3 points, defaults to 1 if not provided
-	IsSecret      *bool  `json:"is_secret"` // nil = use default (negative=secret, positive=open)
+	ToUserID      uint64  `json:"to_user_id" binding:"required"`
+	AchievementID string  `json:"achievement_id" binding:"required"`
+	Points        int     `json:"points"`    // 1-3 points, defaults to 1 if not provided
+	IsSecret      *bool   `json:"is_secret"` // nil = use default (negative=secret, positive=open)
+	Comment       *string `json:"comment"`   // optional comment, max 160 characters
 }
 
 // AnonymousUser returns an anonymous PublicUser for secret votes

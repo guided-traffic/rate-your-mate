@@ -1,4 +1,4 @@
-export type WebSocketMessageType = 'vote_received' | 'new_vote' | 'user_joined' | 'settings_update' | 'credits_reset' | 'credits_given' | 'chat_message' | 'new_king' | 'games_sync_progress' | 'games_sync_complete' | 'error';
+export type WebSocketMessageType = 'vote_received' | 'new_vote' | 'user_joined' | 'settings_update' | 'credits_reset' | 'credits_given' | 'chat_message' | 'new_king' | 'games_sync_progress' | 'games_sync_complete' | 'vote_invalidation' | 'error';
 
 export interface WebSocketMessage<T = unknown> {
   type: WebSocketMessageType;
@@ -66,4 +66,9 @@ export interface GamesSyncProgressPayload {
 export interface GamesSyncCompletePayload {
   message: string;
   total_games: number;
+}
+
+export interface VoteInvalidationPayload {
+  vote_id: number;
+  is_invalidated: boolean;
 }

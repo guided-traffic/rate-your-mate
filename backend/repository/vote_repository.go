@@ -20,9 +20,9 @@ func NewVoteRepository() *VoteRepository {
 func (r *VoteRepository) Create(vote *models.Vote) error {
 	return database.WithRetry(func() error {
 		result, err := database.DB.Exec(`
-			INSERT INTO votes (from_user_id, to_user_id, achievement_id, points, is_secret)
-			VALUES (?, ?, ?, ?, ?)`,
-			vote.FromUserID, vote.ToUserID, vote.AchievementID, vote.Points, vote.IsSecret,
+			INSERT INTO votes (from_user_id, to_user_id, achievement_id, points, is_secret, comment)
+			VALUES (?, ?, ?, ?, ?, ?)`,
+			vote.FromUserID, vote.ToUserID, vote.AchievementID, vote.Points, vote.IsSecret, vote.Comment,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create vote: %w", err)
@@ -42,7 +42,7 @@ func (r *VoteRepository) Create(vote *models.Vote) error {
 func (r *VoteRepository) GetRecent(limit int) ([]models.VoteWithDetails, error) {
 	rows, err := database.DB.Query(`
 		SELECT
-			v.id, v.achievement_id, v.points, v.is_secret, v.created_at,
+			v.id, v.achievement_id, v.points, v.is_secret, v.is_invalidated, v.comment, v.created_at,
 			fu.id, fu.steam_id, fu.username, fu.avatar_url, fu.avatar_small, fu.profile_url,
 			tu.id, tu.steam_id, tu.username, tu.avatar_url, tu.avatar_small, tu.profile_url
 		FROM votes v
@@ -59,7 +59,7 @@ func (r *VoteRepository) GetRecent(limit int) ([]models.VoteWithDetails, error) 
 	for rows.Next() {
 		var v models.VoteWithDetails
 		err := rows.Scan(
-			&v.ID, &v.AchievementID, &v.Points, &v.IsSecret, &v.CreatedAt,
+			&v.ID, &v.AchievementID, &v.Points, &v.IsSecret, &v.IsInvalidated, &v.Comment, &v.CreatedAt,
 			&v.FromUser.ID, &v.FromUser.SteamID, &v.FromUser.Username, &v.FromUser.AvatarURL, &v.FromUser.AvatarSmall, &v.FromUser.ProfileURL,
 			&v.ToUser.ID, &v.ToUser.SteamID, &v.ToUser.Username, &v.ToUser.AvatarURL, &v.ToUser.AvatarSmall, &v.ToUser.ProfileURL,
 		)
@@ -83,7 +83,7 @@ func (r *VoteRepository) GetByID(id uint64) (*models.VoteWithDetails, error) {
 	var v models.VoteWithDetails
 	err := database.DB.QueryRow(`
 		SELECT
-			v.id, v.achievement_id, v.points, v.is_secret, v.created_at,
+			v.id, v.achievement_id, v.points, v.is_secret, v.is_invalidated, v.comment, v.created_at,
 			fu.id, fu.steam_id, fu.username, fu.avatar_url, fu.avatar_small, fu.profile_url,
 			tu.id, tu.steam_id, tu.username, tu.avatar_url, tu.avatar_small, tu.profile_url
 		FROM votes v
@@ -91,7 +91,7 @@ func (r *VoteRepository) GetByID(id uint64) (*models.VoteWithDetails, error) {
 		JOIN users tu ON v.to_user_id = tu.id
 		WHERE v.id = ?`, id,
 	).Scan(
-		&v.ID, &v.AchievementID, &v.Points, &v.IsSecret, &v.CreatedAt,
+		&v.ID, &v.AchievementID, &v.Points, &v.IsSecret, &v.IsInvalidated, &v.Comment, &v.CreatedAt,
 		&v.FromUser.ID, &v.FromUser.SteamID, &v.FromUser.Username, &v.FromUser.AvatarURL, &v.FromUser.AvatarSmall, &v.FromUser.ProfileURL,
 		&v.ToUser.ID, &v.ToUser.SteamID, &v.ToUser.Username, &v.ToUser.AvatarURL, &v.ToUser.AvatarSmall, &v.ToUser.ProfileURL,
 	)
@@ -126,7 +126,7 @@ type AchievementLeaderboard struct {
 
 // GetLeaderboard returns the top N users per achievement
 func (r *VoteRepository) GetLeaderboard(topN int) ([]AchievementLeaderboard, error) {
-	// Get all achievements and their top voters (sum of points)
+	// Get all achievements and their top voters (sum of points), excluding invalidated votes
 	rows, err := database.DB.Query(`
 		SELECT
 			v.achievement_id,
@@ -134,6 +134,7 @@ func (r *VoteRepository) GetLeaderboard(topN int) ([]AchievementLeaderboard, err
 			SUM(v.points) as vote_count
 		FROM votes v
 		JOIN users u ON v.to_user_id = u.id
+		WHERE v.is_invalidated = 0
 		GROUP BY v.achievement_id, v.to_user_id
 		ORDER BY v.achievement_id, vote_count DESC`)
 	if err != nil {
@@ -285,6 +286,31 @@ func (r *VoteRepository) GetChampions() (*ChampionsResult, error) {
 	return result, nil
 }
 
+// ToggleInvalidation toggles the is_invalidated flag of a vote
+func (r *VoteRepository) ToggleInvalidation(voteID uint64) (bool, error) {
+	var newState bool
+	err := database.WithRetry(func() error {
+		// Toggle is_invalidated: if 0 -> 1, if 1 -> 0
+		_, err := database.DB.Exec(`
+			UPDATE votes
+			SET is_invalidated = CASE WHEN is_invalidated = 0 THEN 1 ELSE 0 END
+			WHERE id = ?`, voteID)
+		if err != nil {
+			return fmt.Errorf("failed to toggle vote invalidation: %w", err)
+		}
+
+		// Get the new state
+		err = database.DB.QueryRow(`SELECT is_invalidated FROM votes WHERE id = ?`, voteID).Scan(&newState)
+		if err != nil {
+			return fmt.Errorf("failed to get new invalidation state: %w", err)
+		}
+
+		return nil
+	})
+
+	return newState, err
+}
+
 // DeleteAll deletes all votes from the database (admin only)
 func (r *VoteRepository) DeleteAll() (int64, error) {
 	var rowsAffected int64
@@ -321,10 +347,10 @@ type GlobalRankingResult struct {
 	MinVotesNeeded int             `json:"min_votes_needed"`
 }
 
-// GetTotalVoteCount returns the total number of votes in the database
+// GetTotalVoteCount returns the total number of valid votes in the database
 func (r *VoteRepository) GetTotalVoteCount() (int, error) {
 	var count int
-	err := database.DB.QueryRow(`SELECT COUNT(*) FROM votes`).Scan(&count)
+	err := database.DB.QueryRow(`SELECT COUNT(*) FROM votes WHERE is_invalidated = 0`).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get total vote count: %w", err)
 	}
@@ -342,6 +368,7 @@ func (r *VoteRepository) getAchievementBonusPoints() (map[uint64]int, error) {
 			MIN(v.created_at) as first_vote
 		FROM votes v
 		WHERE v.achievement_id IN ('pro-player', 'teamplayer', 'clutch-king', 'support-hero', 'stratege', 'good-sport')
+			AND v.is_invalidated = 0
 		GROUP BY v.achievement_id, v.to_user_id
 		ORDER BY v.achievement_id, vote_count DESC, first_vote ASC
 	`)
@@ -394,17 +421,19 @@ func (r *VoteRepository) GetGlobalRanking() ([]PlayerRanking, error) {
 		return nil, err
 	}
 
-	// Step 2: Calculate net votes per user
+	// Step 2: Calculate net votes per user (excluding invalidated votes)
 	rows, err := database.DB.Query(`
 		SELECT
 			u.id, u.steam_id, u.username, u.avatar_url, u.avatar_small, u.profile_url,
 			COALESCE(SUM(CASE
 				WHEN v.achievement_id IN ('pro-player', 'teamplayer', 'clutch-king', 'support-hero', 'stratege', 'good-sport')
+					AND v.is_invalidated = 0
 				THEN v.points
 				ELSE 0
 			END), 0) -
 			COALESCE(SUM(CASE
 				WHEN v.achievement_id IN ('rage-quitter', 'toxic', 'friendly-fire-expert')
+					AND v.is_invalidated = 0
 				THEN v.points
 				ELSE 0
 			END), 0) as net_votes

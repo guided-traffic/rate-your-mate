@@ -9,6 +9,8 @@ export interface Vote {
   achievement: Achievement;
   points: number;
   is_secret: boolean;
+  is_invalidated: boolean;
+  comment?: string;
   created_at: string;
 }
 
@@ -17,6 +19,7 @@ export interface CreateVoteRequest {
   achievement_id: string;
   points?: number; // 1-3 points, defaults to 1
   is_secret?: boolean; // null = use default (negative=secret, positive=open)
+  comment?: string; // optional comment, max 160 characters
 }
 
 export interface VoteResponse {

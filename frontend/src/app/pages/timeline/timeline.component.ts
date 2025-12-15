@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular
 import { CommonModule } from '@angular/common';
 import { VoteService } from '../../services/vote.service';
 import { WebSocketService } from '../../services/websocket.service';
+import { AuthService } from '../../services/auth.service';
 import { Vote } from '../../models/vote.model';
 import { Subscription } from 'rxjs';
 
@@ -34,6 +35,7 @@ import { Subscription } from 'rxjs';
               [class.positive]="vote.achievement.is_positive !== false"
               [class.negative]="vote.achievement.is_positive === false"
               [class.new]="isNew(vote)"
+              [class.invalidated]="vote.is_invalidated"
             >
               <div class="timeline-avatars">
                 <div class="avatar-wrapper">
@@ -70,6 +72,9 @@ import { Subscription } from 'rxjs';
                       <span class="points-badge">+{{ vote.points }}</span>
                     </span>
                   </span>
+                  @if (vote.comment) {
+                    <span class="comment-bubble">{{ vote.comment }}</span>
+                  }
                 </div>
               </div>
 
@@ -79,6 +84,22 @@ import { Subscription } from 'rxjs';
                   <span class="time-relative">({{ formatRelativeTime(vote.created_at) }})</span>
                 </span>
               </div>
+
+              @if (isAdmin()) {
+                <button
+                  class="invalidate-btn"
+                  [class.active]="vote.is_invalidated"
+                  (click)="toggleInvalidation(vote)"
+                  [disabled]="invalidatingVoteId() === vote.id"
+                  [title]="vote.is_invalidated ? 'Vote wieder aktivieren' : 'Vote invalidieren'"
+                >
+                  @if (invalidatingVoteId() === vote.id) {
+                    <span class="spinner-small"></span>
+                  } @else {
+                    {{ vote.is_invalidated ? '✓' : '✕' }}
+                  }
+                </button>
+              }
             </div>
           }
         </div>
@@ -128,6 +149,67 @@ import { Subscription } from 'rxjs';
         background: rgba($accent-primary, 0.05);
         border-color: $accent-primary;
       }
+
+      &.invalidated {
+        opacity: 0.35;
+        filter: grayscale(50%);
+
+        &:hover {
+          opacity: 0.5;
+        }
+      }
+    }
+
+    .invalidate-btn {
+      position: absolute;
+      bottom: 8px;
+      right: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border: 1px solid $border-color;
+      border-radius: $radius-sm;
+      background: $bg-tertiary;
+      color: $text-muted;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all $transition-base;
+
+      &:hover {
+        background: $bg-card;
+        border-color: $accent-negative;
+        color: $accent-negative;
+      }
+
+      &.active {
+        background: rgba($accent-positive, 0.15);
+        border-color: $accent-positive;
+        color: $accent-positive;
+
+        &:hover {
+          background: rgba($accent-positive, 0.25);
+        }
+      }
+
+      &:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+    }
+
+    .spinner-small {
+      width: 14px;
+      height: 14px;
+      border: 2px solid $border-color;
+      border-top-color: $accent-primary;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
 
     @keyframes slideIn {
@@ -188,13 +270,17 @@ import { Subscription } from 'rxjs';
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 8px;
       min-width: 0;
     }
 
     .timeline-text {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
       font-size: 14px;
       line-height: 1.5;
+      flex-wrap: wrap;
 
       .username {
         font-weight: 600;
@@ -202,10 +288,40 @@ import { Subscription } from 'rxjs';
       }
     }
 
+    .comment-bubble {
+      position: relative;
+      background: $bg-tertiary;
+      border: 1px solid $border-color;
+      border-radius: 12px;
+      padding: 6px 12px;
+      font-size: 13px;
+      color: $text-secondary;
+      line-height: 1.4;
+      max-width: 300px;
+      word-wrap: break-word;
+
+      // Speech bubble arrow pointing left
+      &::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: -6px;
+        width: 10px;
+        height: 10px;
+        background: $bg-tertiary;
+        border-left: 1px solid $border-color;
+        border-bottom: 1px solid $border-color;
+        transform: translateY(-50%) rotate(45deg);
+      }
+    }
+
     .timeline-meta {
       position: absolute;
       top: 8px;
       right: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .timeline-time {
@@ -255,23 +371,30 @@ import { Subscription } from 'rxjs';
 export class TimelineComponent implements OnInit, OnDestroy {
   private voteService = inject(VoteService);
   private wsService = inject(WebSocketService);
+  private authService = inject(AuthService);
 
   votes = signal<Vote[]>([]);
   loading = signal(true);
   newVoteIds = signal<Set<number>>(new Set());
+  invalidatingVoteId = signal<number | null>(null);
+
+  isAdmin = computed(() => this.authService.user()?.is_admin ?? false);
 
   private wsSubscription?: Subscription;
   private settingsSubscription?: Subscription;
+  private invalidationSubscription?: Subscription;
 
   ngOnInit(): void {
     this.loadVotes();
     this.subscribeToLiveVotes();
     this.subscribeToSettingsUpdates();
+    this.subscribeToVoteInvalidation();
   }
 
   ngOnDestroy(): void {
     this.wsSubscription?.unsubscribe();
     this.settingsSubscription?.unsubscribe();
+    this.invalidationSubscription?.unsubscribe();
   }
 
   loadVotes(): void {
@@ -330,6 +453,42 @@ export class TimelineComponent implements OnInit, OnDestroy {
           this.votes.set(votes);
         }
       });
+    });
+  }
+
+  subscribeToVoteInvalidation(): void {
+    // Subscribe to vote invalidation updates
+    this.invalidationSubscription = this.wsService.voteInvalidation$.subscribe((payload) => {
+      console.log('Timeline: Vote invalidation update', payload.vote_id, payload.is_invalidated);
+      // Update the specific vote's invalidation status
+      const currentVotes = this.votes();
+      const updatedVotes = currentVotes.map(vote =>
+        vote.id === payload.vote_id
+          ? { ...vote, is_invalidated: payload.is_invalidated }
+          : vote
+      );
+      this.votes.set(updatedVotes);
+    });
+  }
+
+  toggleInvalidation(vote: Vote): void {
+    this.invalidatingVoteId.set(vote.id);
+    this.voteService.toggleInvalidation(vote.id).subscribe({
+      next: (response) => {
+        // Update handled via WebSocket, but also update locally for immediate feedback
+        const currentVotes = this.votes();
+        const updatedVotes = currentVotes.map(v =>
+          v.id === vote.id
+            ? { ...v, is_invalidated: response.is_invalidated }
+            : v
+        );
+        this.votes.set(updatedVotes);
+        this.invalidatingVoteId.set(null);
+      },
+      error: (error) => {
+        console.error('Failed to toggle vote invalidation:', error);
+        this.invalidatingVoteId.set(null);
+      }
     });
   }
 
