@@ -537,7 +537,6 @@ import { Subscription } from 'rxjs';
       cursor: pointer;
 
       &:hover {
-        transform: translateY(-4px);
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
         border-color: $accent-primary;
       }
