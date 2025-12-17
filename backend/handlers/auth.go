@@ -16,27 +16,29 @@ import (
 
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
-	cfg           *config.Config
-	steamAuth     *auth.SteamAuth
-	steamAPI      *auth.SteamAPIClient
-	jwtService    *auth.JWTService
-	userRepo      *repository.UserRepository
-	creditService *services.CreditService
-	gameService   *services.GameService
-	wsHub         *websocket.Hub
+	cfg                *config.Config
+	steamAuth          *auth.SteamAuth
+	steamAPI           *auth.SteamAPIClient
+	jwtService         *auth.JWTService
+	userRepo           *repository.UserRepository
+	creditService      *services.CreditService
+	gameService        *services.GameService
+	avatarCacheService *services.AvatarCacheService
+	wsHub              *websocket.Hub
 }
 
 // NewAuthHandler creates a new auth handler
-func NewAuthHandler(cfg *config.Config, userRepo *repository.UserRepository, creditService *services.CreditService, gameService *services.GameService, wsHub *websocket.Hub) *AuthHandler {
+func NewAuthHandler(cfg *config.Config, userRepo *repository.UserRepository, creditService *services.CreditService, gameService *services.GameService, avatarCacheService *services.AvatarCacheService, wsHub *websocket.Hub) *AuthHandler {
 	return &AuthHandler{
-		cfg:           cfg,
-		steamAuth:     auth.NewSteamAuth(cfg.BackendURL),
-		steamAPI:      auth.NewSteamAPIClient(cfg.SteamAPIKey),
-		jwtService:    auth.NewJWTService(cfg.JWTSecret, cfg.JWTExpirationDays),
-		userRepo:      userRepo,
-		creditService: creditService,
-		gameService:   gameService,
-		wsHub:         wsHub,
+		cfg:                cfg,
+		steamAuth:          auth.NewSteamAuth(cfg.BackendURL),
+		steamAPI:           auth.NewSteamAPIClient(cfg.SteamAPIKey),
+		jwtService:         auth.NewJWTService(cfg.JWTSecret, cfg.JWTExpirationDays),
+		userRepo:           userRepo,
+		creditService:      creditService,
+		gameService:        gameService,
+		avatarCacheService: avatarCacheService,
+		wsHub:              wsHub,
 	}
 }
 
@@ -92,6 +94,7 @@ func (h *AuthHandler) SteamCallback(c *gin.Context) {
 
 	// Fetch player profile from Steam API
 	var username, avatarURL, avatarSmall, profileURL string
+	var originalAvatarURL string // Keep original URL for caching
 	if h.steamAPI.IsConfigured() {
 		player, err := h.steamAPI.GetPlayerSummary(steamID)
 		if err != nil {
@@ -100,15 +103,29 @@ func (h *AuthHandler) SteamCallback(c *gin.Context) {
 			username = "Player_" + steamID[len(steamID)-4:]
 		} else {
 			username = player.PersonaName
-			avatarURL = player.AvatarFull
-			avatarSmall = player.Avatar
+			originalAvatarURL = player.AvatarFull
 			profileURL = player.ProfileURL
 
 			// Replace Steam default avatar with a generated one
-			if auth.IsDefaultAvatar(avatarURL) {
+			if auth.IsDefaultAvatar(originalAvatarURL) {
 				log.Printf("User %s has default Steam avatar, generating fallback", username)
-				avatarURL = auth.GenerateFallbackAvatar(username)
-				avatarSmall = avatarURL // DiceBear SVGs scale well
+				originalAvatarURL = auth.GenerateFallbackAvatar(username)
+			}
+
+			// Cache avatar locally and use the same URL for both full and small
+			// (browsers will scale the image as needed)
+			if h.avatarCacheService != nil {
+				avatarURL = h.avatarCacheService.CacheAvatar(steamID, originalAvatarURL)
+				avatarSmall = avatarURL // Use the same cached image for both
+
+				// Cleanup old avatar files if avatar changed
+				if avatarURL != originalAvatarURL {
+					currentFilename := h.avatarCacheService.GetAvatarFilename(steamID, originalAvatarURL)
+					h.avatarCacheService.CleanupOldAvatars(steamID, currentFilename)
+				}
+			} else {
+				avatarURL = originalAvatarURL
+				avatarSmall = originalAvatarURL
 			}
 
 			log.Printf("Fetched Steam profile: %s (%s)", username, steamID)

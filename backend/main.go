@@ -77,6 +77,7 @@ func main() {
 	// Initialize services
 	creditService := services.NewCreditService(cfg, userRepo)
 	imageCacheService := services.NewImageCacheService()
+	avatarCacheService := services.NewAvatarCacheService(cfg.BackendURL)
 	gameService := services.NewGameService(cfg, userRepo, gameCacheRepo, gameOwnerRepo, imageCacheService)
 	countdownService := services.NewCountdownService(cfg, wsHub, userRepo)
 
@@ -88,8 +89,8 @@ func main() {
 	gameService.PrefetchPinnedGames()
 
 	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(cfg, userRepo, creditService, gameService, wsHub)
-	userHandler := handlers.NewUserHandler(userRepo)
+	authHandler := handlers.NewAuthHandler(cfg, userRepo, creditService, gameService, avatarCacheService, wsHub)
+	userHandler := handlers.NewUserHandler(userRepo, avatarCacheService)
 	achievementHandler := handlers.NewAchievementHandler()
 	voteHandler := handlers.NewVoteHandler(voteRepo, userRepo, creditService, wsHub, cfg)
 	wsHandler := handlers.NewWebSocketHandler(wsHub, authHandler.GetJWTService())
@@ -148,6 +149,9 @@ func main() {
 
 		// Game images (public - allows caching by browsers/CDNs)
 		api.GET("/games/images/:filename", gameHandler.ServeGameImage)
+
+		// Avatar images (public - allows caching by browsers/CDNs)
+		api.GET("/avatars/:filename", userHandler.ServeAvatar)
 
 		// Public countdown endpoint (for login page)
 		api.GET("/countdown", settingsHandler.GetCountdown)
