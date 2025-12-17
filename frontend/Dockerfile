@@ -18,7 +18,7 @@ RUN sed -i "s/__VERSION__/${BUILD_NUMBER}/g" src/environments/environment.prod.t
 RUN npm run build -- --configuration=production
 
 # Production stage
-FROM nginx:1.29.4-alpine
+FROM nginx:1.29.4-alpine-slim
 
 # Remove default entrypoint scripts that try to modify config files
 RUN rm -rf /docker-entrypoint.d/*
