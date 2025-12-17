@@ -58,8 +58,15 @@ import { SettingsService } from '../../services/settings.service';
 
           <button class="btn btn-steam" (click)="login()">
             <img src="logos/steam.png" alt="Steam" class="steam-icon">
-            Mit Steam anmelden
+            Über Steam anmelden*
           </button>
+
+          <p class="privacy-note">
+            <span class="asterisk">*</span>
+            Deine Steam-Logindaten werden direkt an Steam übermittelt – ich bekomme sie nie zu sehen.
+            Durch die Anmeldung erhalte ich lediglich Zugriff auf deinen Spielernamen, Avatar und deine Spieleliste,
+            um die App-Features zu ermöglichen. Keine eigene Nutzerverwaltung, kein Passwort bei mir.
+          </p>
 
           <div class="features">
             <div class="feature">
@@ -270,6 +277,23 @@ import { SettingsService } from '../../services/settings.service';
       .steam-icon {
         height: 42px;
         width: auto;
+      }
+    }
+
+    .privacy-note {
+      margin-top: 16px;
+      font-size: 12px;
+      color: $text-muted;
+      line-height: 1.5;
+      text-align: left;
+      padding: 12px;
+      background: rgba($bg-tertiary, 0.5);
+      border-radius: $radius-sm;
+      border-left: 2px solid $accent-primary;
+
+      .asterisk {
+        color: $accent-primary;
+        font-weight: 600;
       }
     }
 
