@@ -104,9 +104,15 @@ import { Subscription } from 'rxjs';
                     </div>
                     <div class="game-meta">
                       @if (game.owner_count > 0) {
-                        <div class="owners" [title]="getOwnerNames(game.owners)">
+                        <div class="owners has-tooltip">
                           <span class="owner-icon">👥</span>
                           <span>{{ game.owner_count }} {{ game.owner_count === 1 ? 'Besitzer' : 'Besitzer' }}</span>
+                          <div class="owner-tooltip">
+                            <div class="tooltip-title">Besitzer:</div>
+                            @for (ownerName of getOwnerNameList(game.owners); track ownerName) {
+                              <div class="tooltip-owner">{{ ownerName }}</div>
+                            }
+                          </div>
                         </div>
                       } @else {
                         <div class="owners no-owners">
@@ -175,9 +181,15 @@ import { Subscription } from 'rxjs';
                       </div>
                     </div>
                     <div class="game-meta">
-                      <div class="owners" [title]="getOwnerNames(game.owners)">
+                      <div class="owners has-tooltip">
                         <span class="owner-icon">👥</span>
                         <span>{{ game.owner_count }} {{ game.owner_count === 1 ? 'Besitzer' : 'Besitzer' }}</span>
+                        <div class="owner-tooltip">
+                          <div class="tooltip-title">Besitzer:</div>
+                          @for (ownerName of getOwnerNameList(game.owners); track ownerName) {
+                            <div class="tooltip-owner">{{ ownerName }}</div>
+                          }
+                        </div>
                       </div>
                       <div class="categories">
                         @for (cat of getMultiplayerCategories(game.categories); track cat) {
@@ -623,6 +635,7 @@ import { Subscription } from 'rxjs';
           gap: 6px;
           color: $text-secondary;
           font-size: 0.875rem;
+          position: relative;
 
           .owner-icon {
             font-size: 1rem;
@@ -631,6 +644,76 @@ import { Subscription } from 'rxjs';
           &.no-owners {
             color: $accent-error;
             opacity: 0.8;
+          }
+
+          &.has-tooltip {
+            cursor: pointer;
+
+            &:hover {
+              color: $accent-primary;
+
+              .owner-tooltip {
+                opacity: 1;
+                visibility: visible;
+                transform: translateY(0);
+              }
+            }
+          }
+
+          .owner-tooltip {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 0;
+            background: $bg-tertiary;
+            border: 1px solid $border-color;
+            border-radius: 8px;
+            padding: 12px;
+            min-width: 150px;
+            max-width: 250px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(8px);
+            transition: all 0.2s ease;
+            z-index: 100;
+            pointer-events: none;
+
+            &::after {
+              content: '';
+              position: absolute;
+              top: 100%;
+              left: 16px;
+              border: 8px solid transparent;
+              border-top-color: $bg-tertiary;
+            }
+
+            &::before {
+              content: '';
+              position: absolute;
+              top: 100%;
+              left: 15px;
+              border: 9px solid transparent;
+              border-top-color: $border-color;
+            }
+
+            .tooltip-title {
+              font-weight: 600;
+              color: $text-primary;
+              margin-bottom: 8px;
+              font-size: 0.875rem;
+            }
+
+            .tooltip-owner {
+              color: $text-secondary;
+              font-size: 0.8125rem;
+              padding: 2px 0;
+
+              &:not(:last-child) {
+                border-bottom: 1px solid rgba($border-color, 0.5);
+                padding-bottom: 4px;
+                margin-bottom: 4px;
+              }
+            }
           }
         }
 
@@ -882,6 +965,11 @@ export class GamesComponent implements OnInit, OnDestroy {
     return owners
       .map(steamId => this.userMap.get(steamId) || steamId)
       .join(', ');
+  }
+
+  getOwnerNameList(owners: string[]): string[] {
+    if (!owners || owners.length === 0) return [];
+    return owners.map(steamId => this.userMap.get(steamId) || steamId);
   }
 
   getMultiplayerCategories(categories: string[]): string[] {

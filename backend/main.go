@@ -72,11 +72,12 @@ func main() {
 	voteRepo := repository.NewVoteRepository()
 	chatRepo := repository.NewChatRepository()
 	gameCacheRepo := repository.NewGameCacheRepository()
+	gameOwnerRepo := repository.NewGameOwnerRepository()
 
 	// Initialize services
 	creditService := services.NewCreditService(cfg, userRepo)
 	imageCacheService := services.NewImageCacheService()
-	gameService := services.NewGameService(cfg, userRepo, gameCacheRepo, imageCacheService)
+	gameService := services.NewGameService(cfg, userRepo, gameCacheRepo, gameOwnerRepo, imageCacheService)
 	countdownService := services.NewCountdownService(cfg, wsHub, userRepo)
 
 	// Start countdown watcher

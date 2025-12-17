@@ -34,6 +34,7 @@ type GameService struct {
 	cfg               *config.Config
 	userRepo          *repository.UserRepository
 	gameCacheRepo     *repository.GameCacheRepository
+	gameOwnerRepo     *repository.GameOwnerRepository
 	imageCacheService *ImageCacheService
 	httpClient        *http.Client
 	cache             *gamesCache
@@ -66,11 +67,12 @@ type rateLimiter struct {
 }
 
 // NewGameService creates a new game service
-func NewGameService(cfg *config.Config, userRepo *repository.UserRepository, gameCacheRepo *repository.GameCacheRepository, imageCacheService *ImageCacheService) *GameService {
+func NewGameService(cfg *config.Config, userRepo *repository.UserRepository, gameCacheRepo *repository.GameCacheRepository, gameOwnerRepo *repository.GameOwnerRepository, imageCacheService *ImageCacheService) *GameService {
 	return &GameService{
 		cfg:               cfg,
 		userRepo:          userRepo,
 		gameCacheRepo:     gameCacheRepo,
+		gameOwnerRepo:     gameOwnerRepo,
 		imageCacheService: imageCacheService,
 		httpClient: &http.Client{
 			Timeout: 15 * time.Second,
@@ -386,6 +388,11 @@ func (s *GameService) fetchUserGames(steamID string) ([]models.GameOwnership, er
 	}
 
 	var games []models.GameOwnership
+	var gamesToSave []struct {
+		AppID           int
+		PlaytimeForever int
+	}
+
 	for _, g := range apiResp.Response.Games {
 		games = append(games, models.GameOwnership{
 			SteamID:         steamID,
@@ -394,6 +401,18 @@ func (s *GameService) fetchUserGames(steamID string) ([]models.GameOwnership, er
 			PlaytimeForever: g.PlaytimeForever,
 			IconURL:         g.ImgIconURL,
 		})
+		gamesToSave = append(gamesToSave, struct {
+			AppID           int
+			PlaytimeForever int
+		}{AppID: g.AppID, PlaytimeForever: g.PlaytimeForever})
+	}
+
+	// Persist ownership data to database
+	if len(gamesToSave) > 0 {
+		if err := s.gameOwnerRepo.UpsertBatch(steamID, gamesToSave); err != nil {
+			log.Printf("Warning: Failed to persist game ownership for user %s: %v", steamID, err)
+			// Don't fail the whole operation, just log the warning
+		}
 	}
 
 	return games, nil
