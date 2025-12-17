@@ -77,6 +77,11 @@ func main() {
 	creditService := services.NewCreditService(cfg, userRepo)
 	imageCacheService := services.NewImageCacheService()
 	gameService := services.NewGameService(cfg, userRepo, gameCacheRepo, imageCacheService)
+	countdownService := services.NewCountdownService(cfg, wsHub, userRepo)
+
+	// Start countdown watcher
+	countdownService.Start()
+	defer countdownService.Stop()
 
 	// Prefetch pinned games in background at startup
 	gameService.PrefetchPinnedGames()
@@ -143,6 +148,9 @@ func main() {
 		// Game images (public - allows caching by browsers/CDNs)
 		api.GET("/games/images/:filename", gameHandler.ServeGameImage)
 
+		// Public countdown endpoint (for login page)
+		api.GET("/countdown", settingsHandler.GetCountdown)
+
 		// WebSocket endpoint (token passed as query param, validates internally)
 		api.GET("/ws", wsHandler.HandleConnection)
 
@@ -169,7 +177,7 @@ func main() {
 			protected.GET("/chat", chatHandler.GetMessages)
 			protected.POST("/chat", chatHandler.Create)
 
-			// Voting status (public for authenticated users)
+			// Voting status (for authenticated users)
 			protected.GET("/voting-status", settingsHandler.GetVotingStatus)
 
 			// Leaderboard

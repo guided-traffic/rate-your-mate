@@ -33,12 +33,13 @@ func NewSettingsHandler(cfg *config.Config, wsHub *websocket.Hub, userRepo *repo
 
 // GetSettingsRequest represents the response for GET /settings
 type GetSettingsResponse struct {
-	CreditIntervalMinutes  int    `json:"credit_interval_minutes"`
-	CreditMax              int    `json:"credit_max"`
-	VotingPaused           bool   `json:"voting_paused"`
-	VoteVisibilityMode     string `json:"vote_visibility_mode"` // "user_choice", "all_secret", "all_public"
-	MinVotesForRanking     int    `json:"min_votes_for_ranking"`
-	NegativeVotingDisabled bool   `json:"negative_voting_disabled"`
+	CreditIntervalMinutes  int     `json:"credit_interval_minutes"`
+	CreditMax              int     `json:"credit_max"`
+	VotingPaused           bool    `json:"voting_paused"`
+	VoteVisibilityMode     string  `json:"vote_visibility_mode"` // "user_choice", "all_secret", "all_public"
+	MinVotesForRanking     int     `json:"min_votes_for_ranking"`
+	NegativeVotingDisabled bool    `json:"negative_voting_disabled"`
+	CountdownTarget        *string `json:"countdown_target,omitempty"` // RFC3339 formatted time, null if not set
 }
 
 // UpdateSettingsRequest represents the request body for PUT /settings
@@ -49,34 +50,62 @@ type UpdateSettingsRequest struct {
 	VoteVisibilityMode     *string `json:"vote_visibility_mode"` // "user_choice", "all_secret", "all_public"
 	MinVotesForRanking     *int    `json:"min_votes_for_ranking"`
 	NegativeVotingDisabled *bool   `json:"negative_voting_disabled"`
+	CountdownTarget        *string `json:"countdown_target"` // RFC3339 formatted time, empty string to clear
 }
 
 // VotingStatusResponse represents the response for GET /voting-status
 type VotingStatusResponse struct {
-	VotingPaused           bool `json:"voting_paused"`
-	NegativeVotingDisabled bool `json:"negative_voting_disabled"`
+	VotingPaused           bool    `json:"voting_paused"`
+	NegativeVotingDisabled bool    `json:"negative_voting_disabled"`
+	CountdownTarget        *string `json:"countdown_target,omitempty"` // RFC3339 formatted time, null if not set
+}
+
+// CountdownResponse represents the response for GET /countdown (public endpoint)
+type CountdownResponse struct {
+	CountdownTarget *string `json:"countdown_target,omitempty"` // RFC3339 formatted time, null if not set
+}
+
+// GetCountdown returns only the countdown target (public endpoint for login page)
+// GET /api/v1/countdown
+func (h *SettingsHandler) GetCountdown(c *gin.Context) {
+	response := CountdownResponse{}
+	if !h.cfg.CountdownTarget.IsZero() {
+		formatted := h.cfg.CountdownTarget.Format(time.RFC3339)
+		response.CountdownTarget = &formatted
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // GetVotingStatus returns only the voting paused status (for non-admin users)
 // GET /api/v1/voting-status
 func (h *SettingsHandler) GetVotingStatus(c *gin.Context) {
-	c.JSON(http.StatusOK, VotingStatusResponse{
+	response := VotingStatusResponse{
 		VotingPaused:           h.cfg.VotingPaused,
 		NegativeVotingDisabled: h.cfg.NegativeVotingDisabled,
-	})
+	}
+	if !h.cfg.CountdownTarget.IsZero() {
+		formatted := h.cfg.CountdownTarget.Format(time.RFC3339)
+		response.CountdownTarget = &formatted
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // GetSettings returns the current settings
 // GET /api/v1/admin/settings
 func (h *SettingsHandler) GetSettings(c *gin.Context) {
-	c.JSON(http.StatusOK, GetSettingsResponse{
+	response := GetSettingsResponse{
 		CreditIntervalMinutes:  h.cfg.CreditIntervalMinutes,
 		CreditMax:              h.cfg.CreditMax,
 		VotingPaused:           h.cfg.VotingPaused,
 		VoteVisibilityMode:     h.cfg.VoteVisibilityMode,
 		MinVotesForRanking:     h.cfg.MinVotesForRanking,
 		NegativeVotingDisabled: h.cfg.NegativeVotingDisabled,
-	})
+	}
+	if !h.cfg.CountdownTarget.IsZero() {
+		formatted := h.cfg.CountdownTarget.Format(time.RFC3339)
+		response.CountdownTarget = &formatted
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // UpdateSettings updates the settings (admin only)
@@ -181,25 +210,57 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 		}
 	}
 
+	if req.CountdownTarget != nil {
+		if *req.CountdownTarget == "" {
+			// Clear the countdown
+			h.cfg.CountdownTarget = time.Time{}
+			updated = true
+			log.Printf("Admin cleared countdown target")
+		} else {
+			// Parse and set the countdown
+			parsedTime, err := time.Parse(time.RFC3339, *req.CountdownTarget)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{
+					"error": "countdown_target must be in RFC3339 format (e.g., 2024-12-31T18:00:00Z)",
+				})
+				return
+			}
+			h.cfg.CountdownTarget = parsedTime
+			updated = true
+			log.Printf("Admin set countdown target to %v", parsedTime)
+		}
+	}
+
 	// Broadcast settings change to all connected clients
 	if updated {
+		var countdownTarget *string
+		if !h.cfg.CountdownTarget.IsZero() {
+			formatted := h.cfg.CountdownTarget.Format(time.RFC3339)
+			countdownTarget = &formatted
+		}
 		h.wsHub.BroadcastSettingsUpdate(&websocket.SettingsPayload{
 			CreditIntervalMinutes:  h.cfg.CreditIntervalMinutes,
 			CreditMax:              h.cfg.CreditMax,
 			VotingPaused:           h.cfg.VotingPaused,
 			VoteVisibilityMode:     h.cfg.VoteVisibilityMode,
 			NegativeVotingDisabled: h.cfg.NegativeVotingDisabled,
+			CountdownTarget:        countdownTarget,
 		})
 	}
 
-	c.JSON(http.StatusOK, GetSettingsResponse{
+	response := GetSettingsResponse{
 		CreditIntervalMinutes:  h.cfg.CreditIntervalMinutes,
 		CreditMax:              h.cfg.CreditMax,
 		VotingPaused:           h.cfg.VotingPaused,
 		VoteVisibilityMode:     h.cfg.VoteVisibilityMode,
 		MinVotesForRanking:     h.cfg.MinVotesForRanking,
 		NegativeVotingDisabled: h.cfg.NegativeVotingDisabled,
-	})
+	}
+	if !h.cfg.CountdownTarget.IsZero() {
+		formatted := h.cfg.CountdownTarget.Format(time.RFC3339)
+		response.CountdownTarget = &formatted
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // ResetAllCreditsResponse represents the response for POST /admin/credits/reset

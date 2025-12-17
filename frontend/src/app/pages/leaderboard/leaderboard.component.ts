@@ -1,7 +1,8 @@
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { VoteService } from '../../services/vote.service';
 import { WebSocketService } from '../../services/websocket.service';
+import { SettingsService } from '../../services/settings.service';
 import { AchievementLeaderboard, ChampionsResult } from '../../models/vote.model';
 import { Subscription } from 'rxjs';
 
@@ -15,6 +16,25 @@ import { Subscription } from 'rxjs';
         <h1 class="page-title">Leaderboard</h1>
         <p class="page-subtitle">Top 3 Spieler pro Achievement</p>
       </div>
+
+      <!-- Countdown Section -->
+      @if (hasCountdown() && !isCountdownExpired()) {
+        <div class="countdown-card">
+          <div class="countdown-content">
+            <span class="countdown-icon">⏰</span>
+            <span class="countdown-label">Countdown bis zum Start:</span>
+            <div class="countdown-timer">
+              <span class="countdown-value">{{ countdownDays() }}</span><span class="countdown-unit">T</span>
+              <span class="countdown-separator">:</span>
+              <span class="countdown-value">{{ countdownHours() }}</span><span class="countdown-unit">H</span>
+              <span class="countdown-separator">:</span>
+              <span class="countdown-value">{{ countdownMinutes() }}</span><span class="countdown-unit">M</span>
+              <span class="countdown-separator">:</span>
+              <span class="countdown-value">{{ countdownSeconds() }}</span><span class="countdown-unit">S</span>
+            </div>
+          </div>
+        </div>
+      }
 
       @if (loading()) {
         <div class="loading-container">
@@ -218,6 +238,71 @@ import { Subscription } from 'rxjs';
   `,
   styles: [`
     @use 'variables' as *;
+
+    .countdown-card {
+      background: linear-gradient(135deg, rgba($accent-primary, 0.15), rgba($accent-secondary, 0.15));
+      border: 1px solid rgba($accent-primary, 0.3);
+      border-radius: $radius-lg;
+      padding: 16px 24px;
+      margin-bottom: 24px;
+
+      &.expired {
+        background: linear-gradient(135deg, rgba($accent-success, 0.15), rgba($accent-primary, 0.15));
+        border-color: rgba($accent-success, 0.3);
+      }
+    }
+
+    .countdown-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .countdown-icon {
+      font-size: 24px;
+    }
+
+    .countdown-label {
+      font-size: 16px;
+      font-weight: 500;
+      color: $text-secondary;
+    }
+
+    .countdown-text {
+      font-size: 18px;
+      font-weight: 600;
+      color: $accent-success;
+    }
+
+    .countdown-timer {
+      display: flex;
+      align-items: baseline;
+      gap: 2px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .countdown-value {
+      font-size: 24px;
+      font-weight: 700;
+      background: $gradient-primary;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .countdown-unit {
+      font-size: 12px;
+      color: $text-muted;
+      margin-right: 4px;
+    }
+
+    .countdown-separator {
+      font-size: 20px;
+      color: $text-muted;
+      margin: 0 2px;
+    }
 
     .loading-container {
       display: flex;
@@ -588,23 +673,93 @@ import { Subscription } from 'rxjs';
 export class LeaderboardComponent implements OnInit, OnDestroy {
   private voteService = inject(VoteService);
   private wsService = inject(WebSocketService);
+  private settingsService = inject(SettingsService);
 
   positiveAchievements = signal<AchievementLeaderboard[]>([]);
   negativeAchievements = signal<AchievementLeaderboard[]>([]);
   champions = signal<ChampionsResult | null>(null);
   loading = signal(true);
 
+  // Countdown
+  private countdownInterval: ReturnType<typeof setInterval> | null = null;
+  private countdownTargetTime = signal<Date | null>(null);
+  private currentTime = signal<Date>(new Date());
+
+  hasCountdown = computed(() => this.countdownTargetTime() !== null);
+  isCountdownExpired = computed(() => {
+    const target = this.countdownTargetTime();
+    if (!target) return false;
+    return this.currentTime() >= target;
+  });
+
+  private remainingMs = computed(() => {
+    const target = this.countdownTargetTime();
+    if (!target) return 0;
+    const diff = target.getTime() - this.currentTime().getTime();
+    return Math.max(0, diff);
+  });
+
+  countdownDays = computed(() => {
+    const ms = this.remainingMs();
+    return String(Math.floor(ms / (1000 * 60 * 60 * 24))).padStart(2, '0');
+  });
+
+  countdownHours = computed(() => {
+    const ms = this.remainingMs();
+    return String(Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))).padStart(2, '0');
+  });
+
+  countdownMinutes = computed(() => {
+    const ms = this.remainingMs();
+    return String(Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60))).padStart(2, '0');
+  });
+
+  countdownSeconds = computed(() => {
+    const ms = this.remainingMs();
+    return String(Math.floor((ms % (1000 * 60)) / 1000)).padStart(2, '0');
+  });
+
   private newVoteSubscription?: Subscription;
   private voteInvalidationSubscription?: Subscription;
+  private settingsSubscription?: Subscription;
 
   ngOnInit(): void {
     this.loadData();
     this.subscribeToVoteUpdates();
+    this.initCountdown();
   }
 
   ngOnDestroy(): void {
     this.newVoteSubscription?.unsubscribe();
     this.voteInvalidationSubscription?.unsubscribe();
+    this.settingsSubscription?.unsubscribe();
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+    }
+  }
+
+  private initCountdown(): void {
+    // Load initial countdown from settings service
+    const countdownTarget = this.settingsService.countdownTarget();
+    if (countdownTarget) {
+      this.countdownTargetTime.set(new Date(countdownTarget));
+    }
+
+    // Subscribe to settings updates (via WebSocket)
+    this.settingsSubscription = this.wsService.settingsUpdate$.subscribe((settings) => {
+      if (settings.countdown_target !== undefined) {
+        if (settings.countdown_target) {
+          this.countdownTargetTime.set(new Date(settings.countdown_target));
+        } else {
+          this.countdownTargetTime.set(null);
+        }
+      }
+    });
+
+    // Update current time every second
+    this.countdownInterval = setInterval(() => {
+      this.currentTime.set(new Date());
+    }, 1000);
   }
 
   private subscribeToVoteUpdates(): void {

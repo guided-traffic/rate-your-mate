@@ -5,6 +5,7 @@ export interface Settings {
   vote_visibility_mode: 'user_choice' | 'all_secret' | 'all_public';
   min_votes_for_ranking: number;
   negative_voting_disabled: boolean;
+  countdown_target?: string | null; // RFC3339 formatted time, null if not set
 }
 
 export interface UpdateSettingsRequest {
@@ -14,6 +15,7 @@ export interface UpdateSettingsRequest {
   vote_visibility_mode?: 'user_choice' | 'all_secret' | 'all_public';
   min_votes_for_ranking?: number;
   negative_voting_disabled?: boolean;
+  countdown_target?: string | null; // RFC3339 formatted time, empty string or null to clear
 }
 
 export interface CreditActionResponse {

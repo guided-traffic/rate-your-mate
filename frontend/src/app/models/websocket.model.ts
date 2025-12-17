@@ -26,6 +26,7 @@ export interface SettingsPayload {
   voting_paused: boolean;
   vote_visibility_mode: 'user_choice' | 'all_secret' | 'all_public';
   negative_voting_disabled: boolean;
+  countdown_target?: string | null;
 }
 
 export interface CreditActionPayload {

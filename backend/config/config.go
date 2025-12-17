@@ -61,6 +61,9 @@ type Config struct {
 
 	// Games
 	PinnedGameIDs []int // App IDs of pinned/featured games
+
+	// Countdown
+	CountdownTarget time.Time // Target time for countdown (when it reaches zero, voting pause is lifted)
 }
 
 // Load reads configuration from environment variables
@@ -113,6 +116,9 @@ func Load() *Config {
 		AdminSteamIDs: getEnvAsStringSlice("ADMIN_STEAM_IDS", []string{}),
 		AdminPassword: getEnv("ADMIN_PASSWORD", ""),
 		PinnedGameIDs: getEnvAsIntSlice("PINNED_GAME_IDS", []int{}),
+
+		// Countdown
+		CountdownTarget: getEnvAsTime("COUNTDOWN_TARGET", time.Time{}),
 	}
 
 	// Validate required configuration
@@ -200,6 +206,18 @@ func getEnvAsIntSlice(key string, defaultValue []int) []int {
 			}
 		}
 		return result
+	}
+	return defaultValue
+}
+
+// getEnvAsTime reads an environment variable as a time.Time (RFC3339 format) or returns a default value
+// Supports formats like "2024-12-31T18:00:00Z" or "2024-12-31T19:00:00+01:00"
+func getEnvAsTime(key string, defaultValue time.Time) time.Time {
+	if value, exists := os.LookupEnv(key); exists && value != "" {
+		if t, err := time.Parse(time.RFC3339, value); err == nil {
+			return t
+		}
+		log.Printf("WARNING: Failed to parse %s as RFC3339 time: %s", key, value)
 	}
 	return defaultValue
 }

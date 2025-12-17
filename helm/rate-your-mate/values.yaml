@@ -61,6 +61,11 @@ backend:
     # Find App IDs at https://steamdb.info/ or in Steam Store URLs
     # Examples: 730 (CS2), 252490 (Rust), 4000 (Garry's Mod), 945360 (Among Us)
     PINNED_GAME_IDS: ""
+    # Initial countdown target for the login page (RFC3339 format)
+    # When the countdown reaches zero, voting pause is automatically lifted
+    # Example: "2024-12-31T18:00:00Z" or "2024-12-31T19:00:00+01:00"
+    # Leave empty for no countdown (can be set later via Admin Panel)
+    COUNTDOWN_TARGET: ""
 
 # Database configuration
 database:

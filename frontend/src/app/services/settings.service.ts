@@ -7,6 +7,7 @@ import { Settings, UpdateSettingsRequest, CreditActionResponse } from '../models
 export interface VotingStatusResponse {
   voting_paused: boolean;
   negative_voting_disabled: boolean;
+  countdown_target?: string | null; // RFC3339 formatted time, null if not set
 }
 
 export interface AdminPasswordRequiredResponse {
@@ -56,6 +57,10 @@ export class SettingsService {
   private negativeVotingDisabledSignal = signal(false);
   readonly negativeVotingDisabled = this.negativeVotingDisabledSignal.asReadonly();
 
+  // Countdown target (RFC3339 formatted time, null if not set)
+  private countdownTargetSignal = signal<string | null>(null);
+  readonly countdownTarget = this.countdownTargetSignal.asReadonly();
+
   constructor(private http: HttpClient) {
     // Load voting status on service init
     this.loadVotingStatus();
@@ -67,11 +72,17 @@ export class SettingsService {
       next: (response) => {
         this.votingPausedSignal.set(response.voting_paused);
         this.negativeVotingDisabledSignal.set(response.negative_voting_disabled);
+        this.countdownTargetSignal.set(response.countdown_target || null);
       },
       error: (err) => {
         console.error('Failed to load voting status:', err);
       }
     });
+  }
+
+  // Load countdown for public access (no auth required) - returns Observable
+  getPublicCountdown(): Observable<{ countdown_target?: string | null }> {
+    return this.http.get<{ countdown_target?: string | null }>(`${environment.apiUrl}/countdown`);
   }
 
   // Check if admin password is required
@@ -90,6 +101,7 @@ export class SettingsService {
         this.settings.set(settings);
         this.votingPausedSignal.set(settings.voting_paused);
         this.negativeVotingDisabledSignal.set(settings.negative_voting_disabled);
+        this.countdownTargetSignal.set(settings.countdown_target || null);
       })
     );
   }
@@ -100,6 +112,7 @@ export class SettingsService {
         this.settings.set(settings);
         this.votingPausedSignal.set(settings.voting_paused);
         this.negativeVotingDisabledSignal.set(settings.negative_voting_disabled);
+        this.countdownTargetSignal.set(settings.countdown_target || null);
       })
     );
   }
@@ -144,6 +157,9 @@ export class SettingsService {
     }
     if (settings.negative_voting_disabled !== undefined) {
       this.negativeVotingDisabledSignal.set(settings.negative_voting_disabled);
+    }
+    if (settings.countdown_target !== undefined) {
+      this.countdownTargetSignal.set(settings.countdown_target || null);
     }
     const current = this.settings();
     if (current) {

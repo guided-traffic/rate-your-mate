@@ -80,6 +80,10 @@ spec:
             - name: PINNED_GAME_IDS
               value: "{{ .Values.backend.env.PINNED_GAME_IDS }}"
             {{- end }}
+            {{- if .Values.backend.env.COUNTDOWN_TARGET }}
+            - name: COUNTDOWN_TARGET
+              value: "{{ .Values.backend.env.COUNTDOWN_TARGET }}"
+            {{- end }}
             {{- if or .Values.secrets.existingSecret (and .Values.secrets.create .Values.secrets.steamApiKey) }}
             - name: STEAM_API_KEY
               valueFrom:

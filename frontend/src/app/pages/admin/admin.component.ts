@@ -217,6 +217,62 @@ import { GameService } from '../../services/game.service';
               </button>
             </div>
 
+            <!-- Countdown Settings -->
+            <div class="countdown-settings-card">
+              <h3>⏰ Countdown zur LAN-Party</h3>
+              <p class="action-description">
+                Setze einen Countdown, der auf der Login-Seite angezeigt wird. Bei Ablauf wird die Vote-Pause automatisch aufgehoben.
+              </p>
+              <div class="countdown-form">
+                <div class="countdown-inputs">
+                  <div class="input-group">
+                    <label for="countdownDate">Datum</label>
+                    <input
+                      type="date"
+                      id="countdownDate"
+                      [(ngModel)]="countdownDate"
+                      class="countdown-input"
+                    />
+                  </div>
+                  <div class="input-group">
+                    <label for="countdownTime">Uhrzeit</label>
+                    <input
+                      type="time"
+                      id="countdownTime"
+                      [(ngModel)]="countdownTime"
+                      class="countdown-input"
+                    />
+                  </div>
+                </div>
+                @if (hasCountdownTarget()) {
+                  <div class="current-countdown">
+                    <span class="countdown-icon">📅</span>
+                    <span>Aktueller Countdown: {{ formatCountdownTarget() }}</span>
+                  </div>
+                }
+                <div class="countdown-actions">
+                  <button
+                    (click)="saveCountdown()"
+                    [disabled]="updatingCountdown() || !countdownDate || !countdownTime"
+                    class="save-countdown-btn"
+                  >
+                    @if (updatingCountdown()) {
+                      <span class="btn-spinner"></span>
+                    } @else {
+                      💾 Countdown speichern
+                    }
+                  </button>
+                  <button
+                    (click)="clearCountdown()"
+                    [disabled]="updatingCountdown() || !hasCountdownTarget()"
+                    class="clear-countdown-btn"
+                  >
+                    🗑️ Countdown löschen
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div class="visibility-card">
               <h3>👁️ Abstimmungs-Sichtbarkeit</h3>
               <p class="action-description">
@@ -480,6 +536,7 @@ import { GameService } from '../../services/game.service';
     </div>
   `,
   styles: [`
+    @use 'sass:color';
     @use 'variables' as *;
 
     .admin-page {
@@ -1195,6 +1252,132 @@ import { GameService } from '../../services/game.service';
       }
     }
 
+    /* Countdown Settings Card */
+    .countdown-settings-card {
+      background: $bg-card;
+      border: 1px solid $border-color;
+      border-radius: $radius-lg;
+      padding: 24px;
+      margin-bottom: 24px;
+
+      h3 {
+        font-size: 18px;
+        font-weight: 600;
+        color: $text-primary;
+        margin-bottom: 8px;
+      }
+    }
+
+    .countdown-form {
+      margin-top: 16px;
+    }
+
+    .countdown-inputs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+
+      .input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+
+        label {
+          font-size: 13px;
+          color: $text-secondary;
+          font-weight: 500;
+        }
+      }
+
+      .countdown-input {
+        padding: 12px 14px;
+        border: 1px solid $border-color;
+        border-radius: $radius-md;
+        background: $bg-tertiary;
+        color: $text-primary;
+        font-size: 15px;
+        transition: all $transition-fast;
+
+        &:focus {
+          outline: none;
+          border-color: $accent-primary;
+          box-shadow: 0 0 0 3px rgba($accent-primary, 0.1);
+        }
+      }
+    }
+
+    .current-countdown {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      background: rgba($accent-primary, 0.1);
+      border: 1px solid rgba($accent-primary, 0.2);
+      border-radius: $radius-md;
+      margin-bottom: 16px;
+      font-size: 14px;
+      color: $text-primary;
+
+      .countdown-icon {
+        font-size: 16px;
+      }
+    }
+
+    .countdown-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    .save-countdown-btn {
+      flex: 1;
+      padding: 12px 20px;
+      background: $accent-primary;
+      color: white;
+      border: none;
+      border-radius: $radius-md;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all $transition-fast;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+
+      &:hover:not(:disabled) {
+        background: color.adjust($accent-primary, $lightness: -10%);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+
+    .clear-countdown-btn {
+      padding: 12px 20px;
+      background: transparent;
+      color: $text-secondary;
+      border: 1px solid $border-color;
+      border-radius: $radius-md;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all $transition-fast;
+
+      &:hover:not(:disabled) {
+        background: rgba($accent-error, 0.1);
+        border-color: $accent-error;
+        color: $accent-error;
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+
     /* Visibility Mode Card */
     .visibility-card {
       background: $bg-card;
@@ -1559,6 +1742,13 @@ export class AdminComponent implements OnInit, AfterViewChecked {
   voteVisibilityMode = signal<'user_choice' | 'all_secret' | 'all_public'>('user_choice');
   updatingVisibility = signal(false);
 
+  // Countdown management
+  countdownDate = '';
+  countdownTime = '';
+  updatingCountdown = signal(false);
+  private countdownTargetSignal = signal<string | null>(null);
+  hasCountdownTarget = () => this.countdownTargetSignal() !== null;
+
   // Player management
   allUsers = signal<AdminUserInfo[]>([]);
   bannedUsers = signal<BannedUser[]>([]);
@@ -1669,6 +1859,18 @@ export class AdminComponent implements OnInit, AfterViewChecked {
         this.originalCreditIntervalMinutes = settings.credit_interval_minutes;
         this.originalCreditMax = settings.credit_max;
         this.originalMinVotesForRanking = settings.min_votes_for_ranking;
+
+        // Load countdown target
+        this.countdownTargetSignal.set(settings.countdown_target || null);
+        if (settings.countdown_target) {
+          const date = new Date(settings.countdown_target);
+          this.countdownDate = date.toISOString().split('T')[0];
+          this.countdownTime = date.toTimeString().slice(0, 5);
+        } else {
+          this.countdownDate = '';
+          this.countdownTime = '';
+        }
+
         this.loading.set(false);
 
         // Load player management data
@@ -1976,5 +2178,63 @@ export class AdminComponent implements OnInit, AfterViewChecked {
   isCurrentUser(user: AdminUserInfo): boolean {
     const currentUser = this.authService.user();
     return currentUser !== null && currentUser.id === user.id;
+  }
+
+  // Countdown management methods
+  formatCountdownTarget(): string {
+    const target = this.countdownTargetSignal();
+    if (!target) return '';
+    const date = new Date(target);
+    return date.toLocaleString('de-DE', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  saveCountdown(): void {
+    if (!this.countdownDate || !this.countdownTime) return;
+
+    this.updatingCountdown.set(true);
+
+    // Combine date and time into ISO string
+    const dateTimeStr = `${this.countdownDate}T${this.countdownTime}:00`;
+    const localDate = new Date(dateTimeStr);
+    const isoString = localDate.toISOString();
+
+    this.settingsService.updateSettings({ countdown_target: isoString }).subscribe({
+      next: (settings) => {
+        this.updatingCountdown.set(false);
+        this.countdownTargetSignal.set(settings.countdown_target || null);
+        this.notifications.success('⏰ Countdown gespeichert', `Countdown auf ${this.formatCountdownTarget()} gesetzt`);
+      },
+      error: (err) => {
+        console.error('Failed to save countdown:', err);
+        this.updatingCountdown.set(false);
+        this.notifications.error('❌ Fehler', 'Countdown konnte nicht gespeichert werden');
+      }
+    });
+  }
+
+  clearCountdown(): void {
+    this.updatingCountdown.set(true);
+
+    this.settingsService.updateSettings({ countdown_target: '' }).subscribe({
+      next: () => {
+        this.updatingCountdown.set(false);
+        this.countdownTargetSignal.set(null);
+        this.countdownDate = '';
+        this.countdownTime = '';
+        this.notifications.success('🗑️ Countdown gelöscht', 'Der Countdown wurde entfernt');
+      },
+      error: (err) => {
+        console.error('Failed to clear countdown:', err);
+        this.updatingCountdown.set(false);
+        this.notifications.error('❌ Fehler', 'Countdown konnte nicht gelöscht werden');
+      }
+    });
   }
 }

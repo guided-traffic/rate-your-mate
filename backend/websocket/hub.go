@@ -69,11 +69,12 @@ type VotePayload struct {
 
 // SettingsPayload contains settings information for broadcasts
 type SettingsPayload struct {
-	CreditIntervalMinutes  int    `json:"credit_interval_minutes"`
-	CreditMax              int    `json:"credit_max"`
-	VotingPaused           bool   `json:"voting_paused"`
-	VoteVisibilityMode     string `json:"vote_visibility_mode"`     // "user_choice", "all_secret", "all_public"
-	NegativeVotingDisabled bool   `json:"negative_voting_disabled"` // When true, negative achievements cannot be voted
+	CreditIntervalMinutes  int     `json:"credit_interval_minutes"`
+	CreditMax              int     `json:"credit_max"`
+	VotingPaused           bool    `json:"voting_paused"`
+	VoteVisibilityMode     string  `json:"vote_visibility_mode"`     // "user_choice", "all_secret", "all_public"
+	NegativeVotingDisabled bool    `json:"negative_voting_disabled"` // When true, negative achievements cannot be voted
+	CountdownTarget        *string `json:"countdown_target,omitempty"` // RFC3339 formatted time, null if not set
 }
 
 // ChatMessagePayload contains chat message information for broadcasts
