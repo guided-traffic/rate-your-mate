@@ -26,7 +26,6 @@ export class AuthService {
   ) {
     // Check for existing token on startup (getToken() automatically removes expired tokens)
     const token = this.getToken();
-    console.log('[AuthService] Constructor - Valid token exists:', !!token);
     this.tokenExists.set(!!token);
     if (token) {
       // Set loading to true BEFORE loadCurrentUser to prevent race condition
@@ -141,11 +140,9 @@ export class AuthService {
   }
 
   loadCurrentUser(): void {
-    console.log('[AuthService] loadCurrentUser - Starting...');
     this.loading.set(true);
     this.http.get<{ user: CurrentUser }>(`${environment.apiUrl}/auth/me`).subscribe({
       next: (response) => {
-        console.log('[AuthService] loadCurrentUser - Success:', response.user.username);
         this.currentUser.set(response.user);
         this.loading.set(false);
       },
