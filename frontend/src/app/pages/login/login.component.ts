@@ -63,7 +63,7 @@ import { SettingsService } from '../../services/settings.service';
 
           <p class="privacy-note">
             <span class="asterisk">*</span>
-            Deine Steam-Logindaten werden direkt an Steam übermittelt – ich bekomme sie nie zu sehen.
+            Deine Logindaten bleiben bei steamcommunity.com.
             Durch die Anmeldung erhalte ich lediglich Zugriff auf deinen Spielernamen, Avatar und deine Spieleliste,
             um die App-Features zu ermöglichen. Keine eigene Nutzerverwaltung, kein Passwort bei mir.
           </p>
